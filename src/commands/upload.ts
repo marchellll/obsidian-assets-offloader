@@ -1,7 +1,13 @@
 /**
  * Upload local whitelist assets from the active note (or its folder).
- * Flow: parse → resolve → PUT → rewrite to public markdown URL → optional trashFile.
- * Progress: status bar ↑done (queued) filename — LiveSync-style.
+ *
+ * Crash-safe order per file:
+ *   1) read local bytes
+ *   2) PUT remote (orphan remote OK if we die here)
+ *   3) vault.process rewrite + re-read verify URL on disk
+ *   4) only then optional trashFile (never if verify fails / other notes still link)
+ *
+ * Kill mid-run → worst case: extra remote object or leftover local file. Note keeps a working link.
  */
 import { App, Notice, TFile, TFolder } from 'obsidian';
 import type AssetsOffloaderPlugin from '../main';
@@ -11,6 +17,7 @@ import { createClient, type S3Client } from '../s3/client';
 import { buildObjectKey } from '../s3/names';
 import { matchesWhitelist } from '../s3/whitelist';
 import { parseAssetRefs } from '../links/parse';
+import { persistLinkRewrite, mayTrashLocalAfterUpload } from '../links/persist';
 import { basenameOf, formatRemoteLink, rewriteTargets } from '../links/rewrite';
 import { showFailures } from '../ui/conflict-modal';
 import { JobProgress } from '../ui/job-progress';
@@ -42,6 +49,16 @@ async function notesLinkingPath(app: App, localPath: string, except?: string): P
 		}
 	}
 	return hits;
+}
+
+/** True if saved note body still has a local ref resolving to `file`. */
+function noteStillLinksFile(app: App, note: TFile, saved: string, file: TFile): boolean {
+	for (const ref of parseAssetRefs(saved)) {
+		if (ref.isRemote) continue;
+		const dest = resolveLocal(app, note, ref.target);
+		if (dest?.path === file.path) return true;
+	}
+	return false;
 }
 
 export interface UploadStats {
@@ -120,42 +137,73 @@ async function uploadNote(
 	const progress =
 		opts?.progress ??
 		new JobProgress(plugin, n, 'progress.upload', plugin.settings.progressCorner);
-	let markdown = content;
 
 	try {
 		for (const file of byPath.values()) {
 			progress.setCurrent(file.name);
 			try {
+				// 1) Local bytes first — if we die after PUT, remote is an orphan, local stays.
 				const bytes = new Uint8Array(await plugin.app.vault.readBinary(file));
 				const key = buildObjectKey(file.name, plugin.settings.prefix);
 				await client.put(key, bytes);
 				const url = client.publicUrl(key);
-				const currentRefs = parseAssetRefs(markdown);
-				markdown = rewriteTargets(
-					markdown,
-					currentRefs,
-					(ref) => {
-						if (ref.isRemote) return false;
-						const dest = resolveLocal(plugin.app, note, ref.target);
-						return dest?.path === file.path;
-					},
-					(ref) =>
-						formatRemoteLink(
-							{ embed: ref.embed, alt: ref.alt || basenameOf(file.name) },
-							url,
+
+				// 2) Persist rewrite + verify URL is actually on disk.
+				const persisted = await persistLinkRewrite(
+					plugin.app,
+					note,
+					(data) =>
+						rewriteTargets(
+							data,
+							parseAssetRefs(data),
+							(ref) => {
+								if (ref.isRemote) return false;
+								const dest = resolveLocal(plugin.app, note, ref.target);
+								return dest?.path === file.path;
+							},
+							(ref) =>
+								formatRemoteLink(
+									{ embed: ref.embed, alt: ref.alt || basenameOf(file.name) },
+									url,
+								),
 						),
+					url,
 				);
+				if (!persisted.ok) {
+					stats.failed++;
+					stats.errors.push(`${file.path}: ${persisted.reason}`);
+					continue;
+				}
 				stats.uploaded++;
 
+				// 3) Delete local only after verified remote link — never before.
 				if (plugin.settings.deleteLocalAfterUpload) {
+					const stillInNote = noteStillLinksFile(
+						plugin.app,
+						note,
+						persisted.saved,
+						file,
+					);
 					const others = await notesLinkingPath(plugin.app, file.path, note.path);
-					if (others.length > 0) {
-						new Notice(
-							t('notices.deleteSkippedLinked', {
-								path: file.path,
-								notes: others.join(', '),
-							}),
-						);
+					if (
+						!mayTrashLocalAfterUpload({
+							verifiedOnDisk: true,
+							stillLinkedInNote: stillInNote,
+							linkedElsewhere: others.length > 0,
+						})
+					) {
+						if (stillInNote) {
+							new Notice(
+								t('notices.deleteSkippedStillLinked', { path: file.path }),
+							);
+						} else if (others.length > 0) {
+							new Notice(
+								t('notices.deleteSkippedLinked', {
+									path: file.path,
+									notes: others.join(', '),
+								}),
+							);
+						}
 					} else {
 						await plugin.app.fileManager.trashFile(file);
 					}
@@ -166,10 +214,6 @@ async function uploadNote(
 			} finally {
 				progress.tick();
 			}
-		}
-
-		if (markdown !== content) {
-			await plugin.app.vault.modify(note, markdown);
 		}
 	} finally {
 		if (ownProgress) progress.finish();
@@ -226,12 +270,11 @@ export async function uploadCurrentFolder(plugin: AssetsOffloaderPlugin): Promis
 		return;
 	}
 
-	// Pre-count queue so status bar shows full folder remaining.
 	let total = 0;
 	const work: TFile[] = [];
 	for (const f of files) {
-		const content = await plugin.app.vault.cachedRead(f);
-		const { byPath } = collectUploadables(plugin, f, content);
+		const body = await plugin.app.vault.cachedRead(f);
+		const { byPath } = collectUploadables(plugin, f, body);
 		if (byPath.size > 0) {
 			total += byPath.size;
 			work.push(f);

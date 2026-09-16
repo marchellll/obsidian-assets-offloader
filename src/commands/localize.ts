@@ -1,11 +1,16 @@
 /**
  * Download remote http(s) assets into the vault attachment location for a note.
- * Same basename + same SHA-256 → reuse file; different bytes → conflict modal (no overwrite).
+ *
+ * Crash-safe order per URL:
+ *   1) download/reuse local file (orphan local OK if we die here — note still has remote URL)
+ *   2) vault.process rewrite + re-read verify local link on disk
+ *   Never deletes the remote object.
  */
-import { Notice, TFile, TFolder } from 'obsidian';
+import { Notice, TFile, TFolder, requestUrl } from 'obsidian';
 import type AssetsOffloaderPlugin from '../main';
 import { t } from '../i18n';
 import { parseAssetRefs } from '../links/parse';
+import { persistLinkRewrite } from '../links/persist';
 import { basenameOf, formatLocalLink, rewriteTargets } from '../links/rewrite';
 import { sameChecksum } from '../links/checksum';
 import { showConflicts, showFailures } from '../ui/conflict-modal';
@@ -27,7 +32,6 @@ interface Stats {
 }
 
 async function downloadUrl(url: string): Promise<Uint8Array> {
-	const { requestUrl } = await import('obsidian');
 	const res = await requestUrl({ url, throw: false });
 	if (res.status < 200 || res.status >= 300) {
 		throw new Error(`HTTP ${res.status} fetching ${url}`);
@@ -37,6 +41,14 @@ async function downloadUrl(url: string): Promise<Uint8Array> {
 
 function remoteTargets(content: string): string[] {
 	return [...new Set(parseAssetRefs(content).filter((r) => r.isRemote).map((r) => r.target))];
+}
+
+function localLinkNeedle(plugin: AssetsOffloaderPlugin, localPath: string): string {
+	const style = plugin.settings.localizedLinkStyle;
+	if (style === 'wikilink') {
+		return localPath.includes('/') ? (localPath.split('/').pop() ?? localPath) : localPath;
+	}
+	return localPath;
 }
 
 async function localizeNote(
@@ -64,8 +76,6 @@ async function localizeNote(
 			'progress.localize',
 			plugin.settings.progressCorner,
 		);
-	let markdown = content;
-	const urlToLocal = new Map<string, string>();
 
 	try {
 		for (const url of remoteUrls) {
@@ -104,7 +114,36 @@ async function localizeNote(
 					finalPath = candidate;
 				}
 
-				urlToLocal.set(url, finalPath);
+				const style = plugin.settings.localizedLinkStyle;
+				const linkName = finalPath.includes('/')
+					? (finalPath.split('/').pop() ?? finalPath)
+					: finalPath;
+				const needle = localLinkNeedle(plugin, finalPath);
+
+				const persisted = await persistLinkRewrite(
+					plugin.app,
+					note,
+					(data) =>
+						rewriteTargets(
+							data,
+							parseAssetRefs(data),
+							(ref) => ref.isRemote && ref.target === url,
+							(ref) =>
+								formatLocalLink(
+									ref,
+									style === 'wikilink' ? linkName : finalPath,
+									style,
+									basenameOf(ref.target),
+								),
+						),
+					needle,
+				);
+				if (!persisted.ok) {
+					stats.failed++;
+					stats.errors.push(`${url}: ${persisted.reason}`);
+					// Orphan local file is OK — note still points at the remote URL.
+					continue;
+				}
 				stats.ok++;
 			} catch (e) {
 				stats.failed++;
@@ -112,28 +151,6 @@ async function localizeNote(
 			} finally {
 				progress.tick();
 			}
-		}
-
-		const style = plugin.settings.localizedLinkStyle;
-		const currentRefs = parseAssetRefs(markdown);
-		markdown = rewriteTargets(
-			markdown,
-			currentRefs,
-			(ref) => ref.isRemote && urlToLocal.has(ref.target),
-			(ref) => {
-				const path = urlToLocal.get(ref.target)!;
-				const linkName = path.includes('/') ? path.split('/').pop()! : path;
-				return formatLocalLink(
-					ref,
-					style === 'wikilink' ? linkName : path,
-					style,
-					basenameOf(ref.target),
-				);
-			},
-		);
-
-		if (markdown !== content) {
-			await plugin.app.vault.modify(note, markdown);
 		}
 	} finally {
 		if (ownProgress) progress.finish();
@@ -171,8 +188,8 @@ export async function localizeCurrentFolder(plugin: AssetsOffloaderPlugin): Prom
 	let total = 0;
 	const work: TFile[] = [];
 	for (const f of files) {
-		const content = await plugin.app.vault.cachedRead(f);
-		const urls = remoteTargets(content);
+		const body = await plugin.app.vault.cachedRead(f);
+		const urls = remoteTargets(body);
 		if (urls.length > 0) {
 			total += urls.length;
 			work.push(f);

@@ -1,9 +1,14 @@
 /**
- * Format and splice link text. Remote links always markdown; local follows setting.
- * Unsafe local markdown paths get encodeURI / <> wrapping so spaces and () don't break.
+ * Format and splice link text.
+ * Remote image embeds → markdown `![](url)`.
+ * Remote video/audio embeds → HTML `<video>`/`<audio>` (Obsidian won't play ![](….mov)).
+ * Local links follow setting (wiki/markdown).
  */
 import type { LocalizedLinkStyle } from '../settings';
 import type { AssetRef } from './parse';
+
+const VIDEO_EXT = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv', 'mkv']);
+const AUDIO_EXT = new Set(['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac']);
 
 /** Encode path for markdown destination; wrap <> if spaces or (). */
 export function markdownDest(path: string): string {
@@ -30,9 +35,41 @@ function decodeURIComponentSafe(s: string): string {
 	}
 }
 
+export function extOfUrlOrPath(urlOrPath: string): string {
+	try {
+		if (/^https?:\/\//i.test(urlOrPath)) {
+			const path = new URL(urlOrPath).pathname;
+			const seg = path.split('/').pop() ?? '';
+			const dot = seg.lastIndexOf('.');
+			return dot >= 0 ? seg.slice(dot + 1).toLowerCase() : '';
+		}
+	} catch {
+		/* fall through */
+	}
+	const base = urlOrPath.split(/[/\\]/).pop() ?? urlOrPath;
+	const clean = base.split('?')[0] ?? base;
+	const dot = clean.lastIndexOf('.');
+	return dot >= 0 ? clean.slice(dot + 1).toLowerCase() : '';
+}
+
+function escapeAttr(url: string): string {
+	return url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
 export function formatRemoteLink(ref: Pick<AssetRef, 'embed' | 'alt'>, url: string): string {
 	const alt = ref.alt || '';
-	return ref.embed ? `![${alt}](${url})` : `[${alt || url}](${url})`;
+	if (!ref.embed) {
+		return `[${alt || url}](${url})`;
+	}
+	const ext = extOfUrlOrPath(url);
+	// Obsidian plays remote video/audio via HTML, not ![](url) (gallery already does this).
+	if (VIDEO_EXT.has(ext)) {
+		return `<video controls src="${escapeAttr(url)}"></video>`;
+	}
+	if (AUDIO_EXT.has(ext)) {
+		return `<audio controls src="${escapeAttr(url)}"></audio>`;
+	}
+	return `![${alt}](${url})`;
 }
 
 export function formatLocalLink(

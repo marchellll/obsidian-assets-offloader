@@ -1,5 +1,5 @@
 /** Simple scrollable list modal — upload failures or localize conflicts. */
-import { App, Modal, Setting } from 'obsidian';
+import { App, Modal, Notice, Setting } from 'obsidian';
 import { t } from '../i18n';
 
 export class ListModal extends Modal {
@@ -14,11 +14,19 @@ export class ListModal extends Modal {
 	onOpen(): void {
 		const { contentEl } = this;
 		contentEl.createEl('h2', { text: this.title });
-		const pre = contentEl.createEl('pre');
+		const pre = contentEl.createEl('pre', { cls: 'assets-offloader-list-modal-body' });
 		pre.setText(this.lines.join('\n'));
-		new Setting(contentEl).addButton((btn) =>
-			btn.setButtonText(t('modal.close')).onClick(() => this.close()),
-		);
+
+		new Setting(contentEl)
+			.addButton((btn) =>
+				btn.setButtonText(t('modal.copy')).onClick(async () => {
+					await navigator.clipboard.writeText(this.lines.join('\n'));
+					new Notice(t('modal.copied'));
+				}),
+			)
+			.addButton((btn) =>
+				btn.setButtonText(t('modal.close')).onClick(() => this.close()),
+			);
 	}
 
 	onClose(): void {

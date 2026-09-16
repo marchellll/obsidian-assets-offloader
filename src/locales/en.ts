@@ -112,6 +112,8 @@ export const en = {
 	'notices.jurisdictionNoAccount':
 		'Could not parse account id from endpoint. Leave endpoint unchanged.',
 	'notices.deleteSkippedLinked': 'Skipped deleting {path}; still linked from: {notes}',
+	'notices.deleteSkippedStillLinked':
+		'Skipped deleting {path}; note still had a local link after save.',
 	'notices.galleryNeedsPublicBase':
 		'Gallery preview needs a Public URL base for private buckets.',
 	'notices.invalidUrl':
@@ -129,10 +131,13 @@ export const en = {
 	'modal.confirm': 'Confirm',
 	'modal.cancel': 'Cancel',
 	'modal.close': 'Close',
+	'modal.copy': 'Copy',
+	'modal.copied': 'Copied to clipboard.',
 
 	'gallery.findNotes': 'Find notes that use this',
 	'gallery.preview': 'Preview',
 	'gallery.select': 'Select',
+	'gallery.selectMonth': 'Select all in {month}',
 	'gallery.deselect': 'Deselect',
 	'gallery.selectAll': 'Select all',
 	'gallery.clearSelection': 'Clear',

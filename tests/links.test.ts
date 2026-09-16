@@ -36,10 +36,34 @@ describe('parseAssetRefs', () => {
 });
 
 describe('rewrite', () => {
-	it('formats remote always markdown', () => {
-		expect(formatRemoteLink({ embed: true, alt: 'x' }, 'https://a/b')).toBe(
-			'![x](https://a/b)',
+	it('formats remote images as markdown', () => {
+		expect(formatRemoteLink({ embed: true, alt: 'x' }, 'https://a/b.png')).toBe(
+			'![x](https://a/b.png)',
 		);
+	});
+
+	it('formats remote video/audio embeds as HTML (Obsidian cannot play ![](….mov))', () => {
+		expect(formatRemoteLink({ embed: true, alt: '' }, 'https://cdn.example.com/a.mov')).toBe(
+			'<video controls src="https://cdn.example.com/a.mov"></video>',
+		);
+		expect(formatRemoteLink({ embed: true, alt: '' }, 'https://cdn.example.com/a.mp3')).toBe(
+			'<audio controls src="https://cdn.example.com/a.mp3"></audio>',
+		);
+		expect(formatRemoteLink({ embed: false, alt: 'clip' }, 'https://cdn.example.com/a.mov')).toBe(
+			'[clip](https://cdn.example.com/a.mov)',
+		);
+	});
+
+	it('parses HTML media embeds', () => {
+		const refs = parseAssetRefs(
+			'<video controls src="https://cdn.example.com/a.mov"></video>',
+		);
+		expect(refs[0]).toMatchObject({
+			kind: 'html',
+			embed: true,
+			isRemote: true,
+			target: 'https://cdn.example.com/a.mov',
+		});
 	});
 
 	it('formats local wikilink', () => {

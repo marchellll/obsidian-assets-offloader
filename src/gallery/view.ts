@@ -17,6 +17,7 @@ import { pickVaultFolder } from '../ui/folder-suggest-modal';
 import { openMediaPreview } from '../ui/media-preview-modal';
 import { JobProgress } from '../ui/job-progress';
 import { parseAssetRefs } from '../links/parse';
+import { persistLinkRewrite } from '../links/persist';
 import { basenameOf, formatLocalLink, rewriteTargets } from '../links/rewrite';
 import { sameChecksum } from '../links/checksum';
 
@@ -31,6 +32,7 @@ interface GalleryEntry {
 	url: string;
 	cell: HTMLElement;
 	check: HTMLInputElement;
+	month: string;
 }
 
 function extOf(key: string): string {
@@ -51,6 +53,10 @@ export class GalleryView extends ItemView {
 	private entries = new Map<string, GalleryEntry>();
 	/** currently checked keys */
 	private selected = new Set<string>();
+	/** month → object keys in that month (loaded cells only) */
+	private monthKeys = new Map<string, Set<string>>();
+	/** month → header checkbox */
+	private monthChecks = new Map<string, HTMLInputElement>();
 
 	constructor(leaf: WorkspaceLeaf, plugin: AssetsOffloaderPlugin) {
 		super(leaf);
@@ -146,6 +152,8 @@ export class GalleryView extends ItemView {
 		this.observer = null;
 		this.entries.clear();
 		this.selected.clear();
+		this.monthKeys.clear();
+		this.monthChecks.clear();
 	}
 
 	private updateSelectionUi(): void {
@@ -159,7 +167,26 @@ export class GalleryView extends ItemView {
 		);
 	}
 
-	private setSelected(key: string, on: boolean): void {
+	/** Checked only when every asset in the month is selected; otherwise unchecked. */
+	private syncMonthCheck(month: string): void {
+		const keys = this.monthKeys.get(month);
+		const check = this.monthChecks.get(month);
+		if (!keys || !check) return;
+		let selectedCount = 0;
+		for (const key of keys) {
+			if (this.selected.has(key)) selectedCount++;
+		}
+		check.indeterminate = false;
+		check.checked = keys.size > 0 && selectedCount === keys.size;
+	}
+
+	private syncAllMonthChecks(): void {
+		for (const month of this.monthKeys.keys()) {
+			this.syncMonthCheck(month);
+		}
+	}
+
+	private applySelected(key: string, on: boolean): void {
 		const entry = this.entries.get(key);
 		if (!entry) return;
 		if (on) {
@@ -171,24 +198,58 @@ export class GalleryView extends ItemView {
 			entry.cell.removeClass('is-selected');
 			entry.check.checked = false;
 		}
+	}
+
+	private setSelected(key: string, on: boolean): void {
+		const entry = this.entries.get(key);
+		if (!entry) return;
+		this.applySelected(key, on);
 		this.updateSelectionUi();
+		this.syncMonthCheck(entry.month);
+	}
+
+	private setMonthSelected(month: string, on: boolean): void {
+		const keys = this.monthKeys.get(month);
+		if (!keys) return;
+		for (const key of keys) {
+			this.applySelected(key, on);
+		}
+		this.updateSelectionUi();
+		this.syncMonthCheck(month);
 	}
 
 	private selectAllVisible(): void {
 		for (const key of this.entries.keys()) {
-			this.setSelected(key, true);
+			this.applySelected(key, true);
 		}
+		this.updateSelectionUi();
+		this.syncAllMonthChecks();
 	}
 
 	private clearSelection(): void {
 		for (const key of [...this.selected]) {
-			this.setSelected(key, false);
+			this.applySelected(key, false);
 		}
+		this.updateSelectionUi();
+		this.syncAllMonthChecks();
+	}
+
+	private removeEntry(key: string): void {
+		const entry = this.entries.get(key);
+		if (!entry) return;
+		this.selected.delete(key);
+		this.entries.delete(key);
+		this.monthKeys.get(entry.month)?.delete(key);
+		entry.cell.remove();
+		this.syncMonthCheck(entry.month);
+		this.updateSelectionUi();
 	}
 
 	private async reload(): Promise<void> {
 		this.clearSelection();
 		this.entries.clear();
+		this.monthKeys.clear();
+		this.monthChecks.clear();
 		this.gridEl.empty();
 		this.months = [];
 		this.loadedCount = 0;
@@ -221,18 +282,30 @@ export class GalleryView extends ItemView {
 		const loading = this.gridEl.createEl('p', { text: t('gallery.loading') });
 		for (let i = this.loadedCount; i < end; i++) {
 			const month = this.months[i]!;
-			const header = this.gridEl.createEl('h3', { text: month });
-			header.addClass('assets-offloader-month');
+			const header = this.gridEl.createDiv({ cls: 'assets-offloader-month' });
+			const monthCheck = header.createEl('input', {
+				cls: 'assets-offloader-month-check',
+				type: 'checkbox',
+				attr: { 'aria-label': t('gallery.selectMonth', { month }) },
+			});
+			header.createSpan({ text: month, cls: 'assets-offloader-month-label' });
+			this.monthChecks.set(month, monthCheck);
+			this.monthKeys.set(month, new Set());
+			monthCheck.addEventListener('change', () => {
+				this.setMonthSelected(month, monthCheck.checked);
+			});
+
 			const objects = await listMonthObjects(this.client, this.plugin.settings.prefix, month);
 			for (const obj of objects) {
-				this.renderCell(obj);
+				this.renderCell(obj, month);
 			}
+			this.syncMonthCheck(month);
 		}
 		loading.remove();
 		this.loadedCount = end;
 	}
 
-	private renderCell(obj: ListedObject): void {
+	private renderCell(obj: ListedObject, month: string): void {
 		if (!this.client) return;
 		const url = this.client.publicUrl(obj.key);
 		const ext = extOf(obj.key);
@@ -263,7 +336,8 @@ export class GalleryView extends ItemView {
 		media.dataset['kind'] = kind;
 		if (kind !== 'other') this.observer?.observe(media);
 
-		this.entries.set(obj.key, { obj, url, cell, check });
+		this.entries.set(obj.key, { obj, url, cell, check, month });
+		this.monthKeys.get(month)?.add(obj.key);
 
 		if (kind === 'image' || kind === 'video' || kind === 'audio') {
 			cell.addClass('assets-offloader-cell-previewable');
@@ -397,22 +471,29 @@ export class GalleryView extends ItemView {
 			if (rewriteNotes) {
 				const style = this.plugin.settings.localizedLinkStyle;
 				const notes = await findNotesUsingUrl(this.app, url);
+				const linkName =
+					style === 'wikilink'
+						? (finalPath.split('/').pop() ?? finalPath)
+						: finalPath;
+				const needle = style === 'wikilink' ? linkName : finalPath;
 				for (const path of notes) {
 					const file = this.app.vault.getAbstractFileByPath(path);
 					if (!(file instanceof TFile)) continue;
-					const content = await this.app.vault.read(file);
-					const refs = parseAssetRefs(content);
-					const linkName =
-						style === 'wikilink'
-							? (finalPath.split('/').pop() ?? finalPath)
-							: finalPath;
-					const next = rewriteTargets(
-						content,
-						refs,
-						(ref) => ref.isRemote && ref.target === url,
-						(ref) => formatLocalLink(ref, linkName, style, basenameOf(url)),
+					const persisted = await persistLinkRewrite(
+						this.app,
+						file,
+						(data) =>
+							rewriteTargets(
+								data,
+								parseAssetRefs(data),
+								(ref) => ref.isRemote && ref.target === url,
+								(ref) => formatLocalLink(ref, linkName, style, basenameOf(url)),
+							),
+						needle,
 					);
-					if (next !== content) await this.app.vault.modify(file, next);
+					if (!persisted.ok) {
+						new Notice(`${path}: ${persisted.reason}`);
+					}
 				}
 			}
 			new Notice(t('gallery.downloadSaved', { path: finalPath }));
@@ -435,7 +516,7 @@ export class GalleryView extends ItemView {
 		}
 	}
 
-	private async deleteObject(obj: ListedObject, url: string, cell: HTMLElement): Promise<void> {
+	private async deleteObject(obj: ListedObject, url: string, _cell: HTMLElement): Promise<void> {
 		if (!this.client) return;
 		const usage = await findNotesUsingUrl(this.app, url);
 		if (usage.length > 0) {
@@ -448,10 +529,7 @@ export class GalleryView extends ItemView {
 		}
 		try {
 			await this.client.delete(obj.key);
-			this.selected.delete(obj.key);
-			this.entries.delete(obj.key);
-			cell.remove();
-			this.updateSelectionUi();
+			this.removeEntry(obj.key);
 		} catch (e) {
 			new Notice(e instanceof Error ? e.message : String(e));
 		}
@@ -496,9 +574,7 @@ export class GalleryView extends ItemView {
 				progress.setCurrent(entry.obj.key.split('/').pop() ?? entry.obj.key);
 				try {
 					await this.client.delete(entry.obj.key);
-					this.selected.delete(entry.obj.key);
-					this.entries.delete(entry.obj.key);
-					entry.cell.remove();
+					this.removeEntry(entry.obj.key);
 				} catch (e) {
 					failed++;
 					new Notice(e instanceof Error ? e.message : String(e));
