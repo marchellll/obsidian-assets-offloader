@@ -46,9 +46,12 @@
 		"Linkpath",
 		"autoplay",
 		"pasteable",
-		"relinks",
+		"prefs",
+		"previewable",
 		"quicktime",
+		"relinks",
+		"Uploadables",
 		"apos",
-		"prefs"
+		"webviewer"
 	]
 }
