@@ -98,7 +98,6 @@ Secrets: settings store **secret ids** only. At call time `getSecret(app, id)` â
 4. If same basename exists: same SHA-256 â†’ reuse path; different â†’ conflict list (no overwrite).
 5. Rewrite to wikilink or markdown per setting.
 
-
 ## Tests map
 
 | Test                      | Covers                                           |
@@ -108,4 +107,3 @@ Secrets: settings store **secret ids** only. At call time `getSecret(app, id)` â
 | `tests/whitelist.test.ts` | Patterns / negation                              |
 | `tests/links.test.ts`     | Parse, rewrite, convert, checksum, usage helpers |
 | `tests/s3-client.test.ts` | List XML + PUT via fake transport                |
-
