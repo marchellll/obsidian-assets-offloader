@@ -1,8 +1,54 @@
 /*
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
-
-If your plugin does not need CSS, delete this file.
+Assets Offloader gallery
 
 */
+
+.assets-offloader-gallery {
+	overflow: auto;
+	height: 100%;
+	padding: 0.5rem;
+}
+
+.assets-offloader-gallery-grid {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	align-items: flex-start;
+}
+
+.assets-offloader-month {
+	flex: 0 0 100%;
+	margin: 0.5rem 0 0;
+}
+
+.assets-offloader-cell {
+	width: 140px;
+	cursor: context-menu;
+}
+
+.assets-offloader-media {
+	width: 140px;
+	height: 140px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--background-secondary);
+	overflow: hidden;
+	border-radius: 4px;
+}
+
+.assets-offloader-media img,
+.assets-offloader-media video {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+}
+
+.assets-offloader-caption {
+	font-size: 0.75rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	margin-top: 0.25rem;
+}

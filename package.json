@@ -1,27 +1,40 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-assets-offloader",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Upload vault attachments to S3-compatible storage and swap links; localize them back.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
-		"lint": "eslint ."
+		"lint": "eslint .",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"spellcheck": "cspell \"src/**/*\" \"docs/**/*\" README.md vision.md",
+		"prepare": "husky"
 	},
 	"keywords": [],
 	"license": "0-BSD",
+	"dependencies": {
+		"aws4fetch": "^1.0.20"
+	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.4",
 		"@types/node": "^22.15.17",
+		"cspell": "^8.19.4",
 		"esbuild": "0.25.5",
 		"eslint": "^9.39.4",
 		"eslint-plugin-obsidianmd": "^0.4.0",
 		"globals": "^17.6.0",
+		"husky": "^9.1.7",
 		"jiti": "^2.6.1",
 		"obsidian": "latest",
+		"prettier": "^3.5.3",
 		"typescript": "^5.8.3",
-		"typescript-eslint": "^8.59.1"
+		"typescript-eslint": "^8.59.1",
+		"vitest": "^3.1.4"
 	}
 }

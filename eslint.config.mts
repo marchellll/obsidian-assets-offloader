@@ -13,6 +13,7 @@ export default defineConfig(
 		'package.json',
 		'package-lock.json',
 		'tsconfig.json',
+		'vitest.config.ts',
 	]),
 	{
 		languageOptions: {
@@ -29,4 +30,10 @@ export default defineConfig(
 		},
 	},
 	...obsidianmd.configs.recommended,
+	{
+		rules: {
+			// SecretComponent + traditional settings; declarative API not used in v1
+			'obsidianmd/settings-tab/prefer-setting-definitions': 'off',
+		},
+	},
 );
