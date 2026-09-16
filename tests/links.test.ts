@@ -49,15 +49,13 @@ describe('rewrite', () => {
 		expect(formatRemoteLink({ embed: true, alt: '' }, 'https://cdn.example.com/a.mp3')).toBe(
 			'<audio controls src="https://cdn.example.com/a.mp3"></audio>',
 		);
-		expect(formatRemoteLink({ embed: false, alt: 'clip' }, 'https://cdn.example.com/a.mov')).toBe(
-			'[clip](https://cdn.example.com/a.mov)',
-		);
+		expect(
+			formatRemoteLink({ embed: false, alt: 'clip' }, 'https://cdn.example.com/a.mov'),
+		).toBe('[clip](https://cdn.example.com/a.mov)');
 	});
 
 	it('parses HTML media embeds', () => {
-		const refs = parseAssetRefs(
-			'<video controls src="https://cdn.example.com/a.mov"></video>',
-		);
+		const refs = parseAssetRefs('<video controls src="https://cdn.example.com/a.mov"></video>');
 		expect(refs[0]).toMatchObject({
 			kind: 'html',
 			embed: true,

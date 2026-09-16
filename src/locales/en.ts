@@ -32,7 +32,8 @@ export const en = {
 	'settings.publicUrlBaseDesc':
 		'Origin used in markdown, e.g. https://cdn.example.com. No trailing slash. Bare hosts get https://.',
 	'settings.prefix': 'Remote folder prefix',
-	'settings.prefixDesc': 'Optional bucket prefix. Upload path is {prefix}/{YYYYMM}/{objectName}. The {YYYYMM} is the year and month of the upload date to keep order, and not updatable.',
+	'settings.prefixDesc':
+		'Optional bucket prefix. Upload path is {prefix}/{YYYYMM}/{objectName}. The {YYYYMM} is the year and month of the upload date to keep order, and not updatable.',
 	'settings.accessKey': 'Access key',
 	'settings.secretKey': 'Secret key',
 	'settings.forcePathStyle': 'Force path-style',

@@ -84,7 +84,9 @@ export class GalleryView extends ItemView {
 		this.selectInfoEl = this.toolbarEl.createSpan({
 			cls: 'assets-offloader-gallery-select-info',
 		});
-		const actions = this.toolbarEl.createDiv({ cls: 'assets-offloader-gallery-toolbar-actions' });
+		const actions = this.toolbarEl.createDiv({
+			cls: 'assets-offloader-gallery-toolbar-actions',
+		});
 
 		const selectAllBtn = actions.createEl('button', {
 			cls: 'mod-muted',
@@ -342,7 +344,10 @@ export class GalleryView extends ItemView {
 		if (kind === 'image' || kind === 'video' || kind === 'audio') {
 			cell.addClass('assets-offloader-cell-previewable');
 			cell.addEventListener('click', (evt) => {
-				if (evt.target instanceof Element && evt.target.closest('.assets-offloader-cell-check')) {
+				if (
+					evt.target instanceof Element &&
+					evt.target.closest('.assets-offloader-cell-check')
+				) {
 					return;
 				}
 				// Shift/meta/ctrl+click toggles selection instead of preview.
@@ -362,7 +367,10 @@ export class GalleryView extends ItemView {
 			});
 		} else {
 			cell.addEventListener('click', (evt) => {
-				if (evt.target instanceof Element && evt.target.closest('.assets-offloader-cell-check')) {
+				if (
+					evt.target instanceof Element &&
+					evt.target.closest('.assets-offloader-cell-check')
+				) {
 					return;
 				}
 				if (evt.shiftKey || evt.metaKey || evt.ctrlKey) {
@@ -376,17 +384,18 @@ export class GalleryView extends ItemView {
 			const menu = new Menu();
 			if (kind === 'image' || kind === 'video' || kind === 'audio') {
 				menu.addItem((item) =>
-					item.setTitle(t('gallery.preview')).setIcon('maximize').onClick(() => {
-						openMediaPreview(this.app, url, kind, name);
-					}),
+					item
+						.setTitle(t('gallery.preview'))
+						.setIcon('maximize')
+						.onClick(() => {
+							openMediaPreview(this.app, url, kind, name);
+						}),
 				);
 			}
 			menu.addItem((item) =>
 				item
 					.setTitle(
-						this.selected.has(obj.key)
-							? t('gallery.deselect')
-							: t('gallery.select'),
+						this.selected.has(obj.key) ? t('gallery.deselect') : t('gallery.select'),
 					)
 					.setIcon('check-square')
 					.onClick(() => {
@@ -432,10 +441,7 @@ export class GalleryView extends ItemView {
 
 			if (rewriteNotes) {
 				const active = this.app.workspace.getActiveFile();
-				dest = await this.app.fileManager.getAvailablePathForAttachment(
-					name,
-					active?.path,
-				);
+				dest = await this.app.fileManager.getAvailablePathForAttachment(name, active?.path);
 				folderPath = dest.includes('/') ? dest.slice(0, dest.lastIndexOf('/')) : '';
 			} else {
 				const folder = await pickVaultFolder(this.app);
@@ -472,9 +478,7 @@ export class GalleryView extends ItemView {
 				const style = this.plugin.settings.localizedLinkStyle;
 				const notes = await findNotesUsingUrl(this.app, url);
 				const linkName =
-					style === 'wikilink'
-						? (finalPath.split('/').pop() ?? finalPath)
-						: finalPath;
+					style === 'wikilink' ? (finalPath.split('/').pop() ?? finalPath) : finalPath;
 				const needle = style === 'wikilink' ? linkName : finalPath;
 				for (const path of notes) {
 					const file = this.app.vault.getAbstractFileByPath(path);
@@ -538,9 +542,7 @@ export class GalleryView extends ItemView {
 	private async deleteSelected(): Promise<void> {
 		if (!this.client || this.selected.size === 0) return;
 		const keys = [...this.selected];
-		const items = keys
-			.map((k) => this.entries.get(k))
-			.filter((e): e is GalleryEntry => !!e);
+		const items = keys.map((k) => this.entries.get(k)).filter((e): e is GalleryEntry => !!e);
 
 		const usedNotes = new Set<string>();
 		for (const entry of items) {
@@ -555,10 +557,7 @@ export class GalleryView extends ItemView {
 			);
 			if (!ok) return;
 		} else {
-			const ok = await confirm(
-				this.app,
-				t('modal.confirmBulkDelete', { n: items.length }),
-			);
+			const ok = await confirm(this.app, t('modal.confirmBulkDelete', { n: items.length }));
 			if (!ok) return;
 		}
 

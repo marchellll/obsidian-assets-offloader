@@ -178,12 +178,7 @@ async function uploadNote(
 
 				// 3) Delete local only after verified remote link — never before.
 				if (plugin.settings.deleteLocalAfterUpload) {
-					const stillInNote = noteStillLinksFile(
-						plugin.app,
-						note,
-						persisted.saved,
-						file,
-					);
+					const stillInNote = noteStillLinksFile(plugin.app, note, persisted.saved, file);
 					const others = await notesLinkingPath(plugin.app, file.path, note.path);
 					if (
 						!mayTrashLocalAfterUpload({
@@ -193,9 +188,7 @@ async function uploadNote(
 						})
 					) {
 						if (stillInNote) {
-							new Notice(
-								t('notices.deleteSkippedStillLinked', { path: file.path }),
-							);
+							new Notice(t('notices.deleteSkippedStillLinked', { path: file.path }));
 						} else if (others.length > 0) {
 							new Notice(
 								t('notices.deleteSkippedLinked', {

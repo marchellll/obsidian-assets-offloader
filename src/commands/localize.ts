@@ -40,7 +40,13 @@ async function downloadUrl(url: string): Promise<Uint8Array> {
 }
 
 function remoteTargets(content: string): string[] {
-	return [...new Set(parseAssetRefs(content).filter((r) => r.isRemote).map((r) => r.target))];
+	return [
+		...new Set(
+			parseAssetRefs(content)
+				.filter((r) => r.isRemote)
+				.map((r) => r.target),
+		),
+	];
 }
 
 function localLinkNeedle(plugin: AssetsOffloaderPlugin, localPath: string): string {

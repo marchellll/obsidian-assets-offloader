@@ -229,8 +229,7 @@ export class AssetsOffloaderSettingTab extends PluginSettingTab {
 		const s = this.plugin.settings;
 		const missing = missingConnectionFields(s);
 		const complete = missing.length === 0;
-		const open =
-			this.connectionOpen === null ? !complete : this.connectionOpen;
+		const open = this.connectionOpen === null ? !complete : this.connectionOpen;
 
 		new Setting(parent).setName(t('settings.sectionConnection')).setHeading();
 
@@ -572,10 +571,7 @@ export class AssetsOffloaderSettingTab extends PluginSettingTab {
 						s.endpoint = `https://${v}.compat.objectstorage.${s.region}.oraclecloud.com`;
 					}
 					await this.plugin.saveSettings();
-					setting.settingEl.toggleClass(
-						'assets-offloader-required-empty',
-						!v.trim(),
-					);
+					setting.settingEl.toggleClass('assets-offloader-required-empty', !v.trim());
 				}),
 			);
 		}

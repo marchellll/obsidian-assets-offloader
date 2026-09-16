@@ -385,29 +385,21 @@ export class S3Client {
 		try {
 			await this.list({ limit: 1, prefix: p ? `${p}/` : undefined });
 		} catch (e) {
-			throw new Error(
-				`List failed: ${e instanceof Error ? e.message : String(e)}`,
-			);
+			throw new Error(`List failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
 
-		const payload = new TextEncoder().encode(
-			`assets-offloader connection probe ${Date.now()}`,
-		);
+		const payload = new TextEncoder().encode(`assets-offloader connection probe ${Date.now()}`);
 		try {
 			await this.put(probeKey, payload, 'text/plain');
 		} catch (e) {
-			throw new Error(
-				`Put failed: ${e instanceof Error ? e.message : String(e)}`,
-			);
+			throw new Error(`Put failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
 
 		let got: Uint8Array;
 		try {
 			got = await this.get(probeKey);
 		} catch (e) {
-			throw new Error(
-				`Get failed: ${e instanceof Error ? e.message : String(e)}`,
-			);
+			throw new Error(`Get failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
 		if (got.byteLength !== payload.byteLength || !bytesEqual(got, payload)) {
 			throw new Error('Get failed: downloaded bytes do not match upload');
@@ -431,10 +423,7 @@ export function createClient(app: App, settings: AssetsOffloaderSettings): S3Cli
 	return new S3Client(connectionFromSettings(app, settings));
 }
 
-export async function testConnection(
-	app: App,
-	settings: AssetsOffloaderSettings,
-): Promise<void> {
+export async function testConnection(app: App, settings: AssetsOffloaderSettings): Promise<void> {
 	const client = createClient(app, settings);
 	await client.testFullAccess(settings.prefix);
 }

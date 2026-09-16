@@ -5,9 +5,7 @@
  */
 import type { App, TFile } from 'obsidian';
 
-export type PersistResult =
-	| { ok: true; saved: string }
-	| { ok: false; reason: string };
+export type PersistResult = { ok: true; saved: string } | { ok: false; reason: string };
 
 /**
  * Atomically rewrite `note` via vault.process, then re-read and require `mustContain`.

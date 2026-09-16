@@ -8,12 +8,7 @@ import { t } from '../i18n';
 
 export type PreviewKind = 'image' | 'video' | 'audio';
 
-export function openMediaPreview(
-	app: App,
-	url: string,
-	kind: PreviewKind,
-	title?: string,
-): void {
+export function openMediaPreview(app: App, url: string, kind: PreviewKind, title?: string): void {
 	new MediaPreviewModal(app, url, kind, title).open();
 }
 
@@ -70,10 +65,14 @@ class MediaPreviewModal extends Modal {
 				attr: { src: this.url, draggable: 'false' },
 			});
 			this.imgEl = img;
-			img.addEventListener('wheel', (e) => {
-				e.preventDefault();
-				this.bumpZoom(e.deltaY < 0 ? 1.1 : 0.9);
-			}, { passive: false });
+			img.addEventListener(
+				'wheel',
+				(e) => {
+					e.preventDefault();
+					this.bumpZoom(e.deltaY < 0 ? 1.1 : 0.9);
+				},
+				{ passive: false },
+			);
 			img.addEventListener('dblclick', () => {
 				if (this.scale > 1.05) this.resetZoom();
 				else this.bumpZoom(2 / this.scale);

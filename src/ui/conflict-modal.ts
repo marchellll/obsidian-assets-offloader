@@ -24,9 +24,7 @@ export class ListModal extends Modal {
 					new Notice(t('modal.copied'));
 				}),
 			)
-			.addButton((btn) =>
-				btn.setButtonText(t('modal.close')).onClick(() => this.close()),
-			);
+			.addButton((btn) => btn.setButtonText(t('modal.close')).onClick(() => this.close()));
 	}
 
 	onClose(): void {

@@ -32,8 +32,8 @@ describe('normalizeHttpUrl', () => {
 
 describe('buildPublicUrl', () => {
 	it('normalizes bare public base', () => {
-		expect(
-			buildPublicUrl('testobsassets.marchell.xyz', '202609/a.png'),
-		).toBe('https://testobsassets.marchell.xyz/202609/a.png');
+		expect(buildPublicUrl('testobsassets.marchell.xyz', '202609/a.png')).toBe(
+			'https://testobsassets.marchell.xyz/202609/a.png',
+		);
 	});
 });
