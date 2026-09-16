@@ -1,8 +1,8 @@
 # Codebase map
 
-Where to look. Product rules live in [`vision.md`](../vision.md). This file is the **tour** map.
+Where to look. This file is the **tour** map.
 
-## Start here (15 minutes)
+## Start here
 
 1. [`src/main.ts`](../src/main.ts) — plugin boot only: load settings, settings tab, commands, gallery.
 2. [`src/settings.ts`](../src/settings.ts) — settings shape + Settings UI (Secret Storage ids, Guess from URL, test connection).
@@ -79,7 +79,7 @@ Secrets: settings store **secret ids** only. At call time `getSecret(app, id)` �
 | `list.ts`  | Discover `YYYYMM` prefixes; list objects newest-first.    |
 | `usage.ts` | Vault scan for notes containing a public URL.             |
 
-## Mental model: one asset trip
+## Mental model
 
 **Upload**
 
@@ -98,11 +98,6 @@ Secrets: settings store **secret ids** only. At call time `getSecret(app, id)` �
 4. If same basename exists: same SHA-256 → reuse path; different → conflict list (no overwrite).
 5. Rewrite to wikilink or markdown per setting.
 
-## Where _not_ to look first
-
-- `main.js` — generated bundle. Edit `src/`, run `npm run build` / `dev`.
-- `vision.md` — long; use after you know the folders.
-- LanTai (external) — reference only; this tree is flatter on purpose.
 
 ## Tests map
 
@@ -114,10 +109,3 @@ Secrets: settings store **secret ids** only. At call time `getSecret(app, id)` �
 | `tests/links.test.ts`     | Parse, rewrite, convert, checksum, usage helpers |
 | `tests/s3-client.test.ts` | List XML + PUT via fake transport                |
 
-## Adding something new
-
-1. Behavior? Check / update `vision.md` first if product-facing.
-2. String? `locales/en.ts` + `t()`.
-3. Logic? Prefer a pure function under `s3/` or `links/` + a test.
-4. UI entry? Wire in `commands/register.ts` (or gallery menu).
-5. Keep `main.ts` free of feature logic.
