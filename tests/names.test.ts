@@ -25,4 +25,8 @@ describe('names', () => {
 			'https://cdn.example.com/a/b%20c/d',
 		);
 	});
+
+	it('adds https when public base lacks scheme', () => {
+		expect(buildPublicUrl('cdn.example.com', 'x.png')).toBe('https://cdn.example.com/x.png');
+	});
 });

@@ -2,6 +2,7 @@
  * Remote asset gallery ItemView + ribbon registration.
  * Months from S3 prefixes; first paint last 5 non-empty; scroll loads older;
  * IntersectionObserver creates media when a cell nears the viewport.
+ * Cells support multi-select + bulk delete.
  */
 import { ItemView, Menu, Notice, TFile, WorkspaceLeaf } from 'obsidian';
 import type AssetsOffloaderPlugin from '../main';
@@ -12,6 +13,9 @@ import { listMonthObjects, listMonths } from './list';
 import { findNotesUsingUrl } from './usage';
 import { showUsage } from '../ui/usage-modal';
 import { confirm } from '../ui/confirm-modal';
+import { pickVaultFolder } from '../ui/folder-suggest-modal';
+import { openMediaPreview } from '../ui/media-preview-modal';
+import { JobProgress } from '../ui/job-progress';
 import { parseAssetRefs } from '../links/parse';
 import { basenameOf, formatLocalLink, rewriteTargets } from '../links/rewrite';
 import { sameChecksum } from '../links/checksum';
@@ -22,6 +26,13 @@ const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'i
 const VIDEO_EXT = new Set(['mp4', 'webm', 'mov', 'm4v']);
 const AUDIO_EXT = new Set(['mp3', 'wav', 'ogg']);
 
+interface GalleryEntry {
+	obj: ListedObject;
+	url: string;
+	cell: HTMLElement;
+	check: HTMLInputElement;
+}
+
 function extOf(key: string): string {
 	return (key.split('.').pop() ?? '').toLowerCase();
 }
@@ -31,8 +42,15 @@ export class GalleryView extends ItemView {
 	private months: string[] = [];
 	private loadedCount = 0;
 	private client: S3Client | null = null;
+	private toolbarEl!: HTMLElement;
+	private selectInfoEl!: HTMLElement;
+	private deleteBtn!: HTMLButtonElement;
 	private gridEl!: HTMLElement;
 	private observer: IntersectionObserver | null = null;
+	/** key → entry for every rendered cell */
+	private entries = new Map<string, GalleryEntry>();
+	/** currently checked keys */
+	private selected = new Set<string>();
 
 	constructor(leaf: WorkspaceLeaf, plugin: AssetsOffloaderPlugin) {
 		super(leaf);
@@ -55,6 +73,34 @@ export class GalleryView extends ItemView {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass('assets-offloader-gallery');
+
+		this.toolbarEl = contentEl.createDiv({ cls: 'assets-offloader-gallery-toolbar' });
+		this.selectInfoEl = this.toolbarEl.createSpan({
+			cls: 'assets-offloader-gallery-select-info',
+		});
+		const actions = this.toolbarEl.createDiv({ cls: 'assets-offloader-gallery-toolbar-actions' });
+
+		const selectAllBtn = actions.createEl('button', {
+			cls: 'mod-muted',
+			text: t('gallery.selectAll'),
+		});
+		selectAllBtn.addEventListener('click', () => this.selectAllVisible());
+
+		const clearBtn = actions.createEl('button', {
+			cls: 'mod-muted',
+			text: t('gallery.clearSelection'),
+		});
+		clearBtn.addEventListener('click', () => this.clearSelection());
+
+		this.deleteBtn = actions.createEl('button', {
+			cls: 'mod-warning',
+			text: t('gallery.deleteSelected'),
+		});
+		this.deleteBtn.disabled = true;
+		this.deleteBtn.addEventListener('click', () => {
+			void this.deleteSelected();
+		});
+
 		this.gridEl = contentEl.createDiv({ cls: 'assets-offloader-gallery-grid' });
 		contentEl.addEventListener('scroll', () => {
 			if (contentEl.scrollTop + contentEl.clientHeight >= contentEl.scrollHeight - 80) {
@@ -91,15 +137,58 @@ export class GalleryView extends ItemView {
 			{ root: contentEl, rootMargin: '200px' },
 		);
 
+		this.updateSelectionUi();
 		await this.reload();
 	}
 
 	async onClose(): Promise<void> {
 		this.observer?.disconnect();
 		this.observer = null;
+		this.entries.clear();
+		this.selected.clear();
+	}
+
+	private updateSelectionUi(): void {
+		const n = this.selected.size;
+		this.selectInfoEl.setText(
+			n === 0 ? t('gallery.selectedNone') : t('gallery.selectedCount', { n }),
+		);
+		this.deleteBtn.disabled = n === 0;
+		this.deleteBtn.setText(
+			n === 0 ? t('gallery.deleteSelected') : t('gallery.deleteSelectedN', { n }),
+		);
+	}
+
+	private setSelected(key: string, on: boolean): void {
+		const entry = this.entries.get(key);
+		if (!entry) return;
+		if (on) {
+			this.selected.add(key);
+			entry.cell.addClass('is-selected');
+			entry.check.checked = true;
+		} else {
+			this.selected.delete(key);
+			entry.cell.removeClass('is-selected');
+			entry.check.checked = false;
+		}
+		this.updateSelectionUi();
+	}
+
+	private selectAllVisible(): void {
+		for (const key of this.entries.keys()) {
+			this.setSelected(key, true);
+		}
+	}
+
+	private clearSelection(): void {
+		for (const key of [...this.selected]) {
+			this.setSelected(key, false);
+		}
 	}
 
 	private async reload(): Promise<void> {
+		this.clearSelection();
+		this.entries.clear();
 		this.gridEl.empty();
 		this.months = [];
 		this.loadedCount = 0;
@@ -146,14 +235,19 @@ export class GalleryView extends ItemView {
 	private renderCell(obj: ListedObject): void {
 		if (!this.client) return;
 		const url = this.client.publicUrl(obj.key);
-		if (
-			!this.plugin.settings.publicUrlBase.trim() &&
-			!this.plugin.settings.spacesCdnUrl.trim()
-		) {
-			// ponytail: v1 gallery thumbs need public base
-		}
 		const ext = extOf(obj.key);
 		const cell = this.gridEl.createDiv({ cls: 'assets-offloader-cell' });
+
+		const check = cell.createEl('input', {
+			cls: 'assets-offloader-cell-check',
+			type: 'checkbox',
+			attr: { 'aria-label': t('gallery.select') },
+		});
+		check.addEventListener('click', (evt) => evt.stopPropagation());
+		check.addEventListener('change', () => {
+			this.setSelected(obj.key, check.checked);
+		});
+
 		const media = cell.createDiv({ cls: 'assets-offloader-media' });
 		const name = obj.key.split('/').pop() ?? obj.key;
 		cell.createDiv({ cls: 'assets-offloader-caption', text: name });
@@ -169,9 +263,62 @@ export class GalleryView extends ItemView {
 		media.dataset['kind'] = kind;
 		if (kind !== 'other') this.observer?.observe(media);
 
+		this.entries.set(obj.key, { obj, url, cell, check });
+
+		if (kind === 'image' || kind === 'video' || kind === 'audio') {
+			cell.addClass('assets-offloader-cell-previewable');
+			cell.addEventListener('click', (evt) => {
+				if (evt.target instanceof Element && evt.target.closest('.assets-offloader-cell-check')) {
+					return;
+				}
+				// Shift/meta/ctrl+click toggles selection instead of preview.
+				if (evt.shiftKey || evt.metaKey || evt.ctrlKey) {
+					evt.preventDefault();
+					this.setSelected(obj.key, !this.selected.has(obj.key));
+					return;
+				}
+				if (
+					kind !== 'image' &&
+					evt.target instanceof Element &&
+					(evt.target.closest('video') || evt.target.closest('audio'))
+				) {
+					return;
+				}
+				openMediaPreview(this.app, url, kind, name);
+			});
+		} else {
+			cell.addEventListener('click', (evt) => {
+				if (evt.target instanceof Element && evt.target.closest('.assets-offloader-cell-check')) {
+					return;
+				}
+				if (evt.shiftKey || evt.metaKey || evt.ctrlKey) {
+					this.setSelected(obj.key, !this.selected.has(obj.key));
+				}
+			});
+		}
+
 		cell.addEventListener('contextmenu', (evt) => {
 			evt.preventDefault();
 			const menu = new Menu();
+			if (kind === 'image' || kind === 'video' || kind === 'audio') {
+				menu.addItem((item) =>
+					item.setTitle(t('gallery.preview')).setIcon('maximize').onClick(() => {
+						openMediaPreview(this.app, url, kind, name);
+					}),
+				);
+			}
+			menu.addItem((item) =>
+				item
+					.setTitle(
+						this.selected.has(obj.key)
+							? t('gallery.deselect')
+							: t('gallery.select'),
+					)
+					.setIcon('check-square')
+					.onClick(() => {
+						this.setSelected(obj.key, !this.selected.has(obj.key));
+					}),
+			);
 			menu.addItem((item) =>
 				item.setTitle(t('gallery.findNotes')).onClick(() => {
 					void findNotesUsingUrl(this.app, url).then((paths) =>
@@ -205,25 +352,42 @@ export class GalleryView extends ItemView {
 	): Promise<void> {
 		if (!this.client) return;
 		const name = obj.key.split('/').pop() ?? 'file';
-		const active = this.app.workspace.getActiveFile();
-		const sourcePath = active?.path ?? '';
 		try {
+			let dest: string;
+			let folderPath = '';
+
+			if (rewriteNotes) {
+				const active = this.app.workspace.getActiveFile();
+				dest = await this.app.fileManager.getAvailablePathForAttachment(
+					name,
+					active?.path,
+				);
+				folderPath = dest.includes('/') ? dest.slice(0, dest.lastIndexOf('/')) : '';
+			} else {
+				const folder = await pickVaultFolder(this.app);
+				if (!folder) {
+					new Notice(t('gallery.downloadCancelled'));
+					return;
+				}
+				folderPath = folder.path;
+				dest = this.nextAvailableInFolder(folderPath, name);
+			}
+
 			const bytes = await this.client.get(obj.key);
-			const dest = await this.app.fileManager.getAvailablePathForAttachment(
-				name,
-				sourcePath || undefined,
-			);
-			const parent = dest.includes('/') ? dest.slice(0, dest.lastIndexOf('/')) : '';
-			const exact = parent ? `${parent}/${name}` : name;
+			const exact = folderPath ? `${folderPath}/${name}` : name;
 			const existing = this.app.vault.getAbstractFileByPath(exact);
 			let finalPath = dest;
+
 			if (existing instanceof TFile) {
 				const existingBytes = new Uint8Array(await this.app.vault.readBinary(existing));
 				if (await sameChecksum(existingBytes, bytes)) {
 					finalPath = existing.path;
-				} else {
+				} else if (rewriteNotes) {
 					new Notice(`Conflict: ${existing.path}`);
 					return;
+				} else {
+					await this.app.vault.createBinary(dest, bytes.buffer as ArrayBuffer);
+					finalPath = dest;
 				}
 			} else {
 				await this.app.vault.createBinary(dest, bytes.buffer as ArrayBuffer);
@@ -251,9 +415,23 @@ export class GalleryView extends ItemView {
 					if (next !== content) await this.app.vault.modify(file, next);
 				}
 			}
-			new Notice(finalPath);
+			new Notice(t('gallery.downloadSaved', { path: finalPath }));
 		} catch (e) {
 			new Notice(e instanceof Error ? e.message : String(e));
+		}
+	}
+
+	/** Unique path under folder (name, name 1.ext, …). */
+	private nextAvailableInFolder(folderPath: string, fileName: string): string {
+		const dot = fileName.lastIndexOf('.');
+		const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
+		const ext = dot > 0 ? fileName.slice(dot) : '';
+		let n = 0;
+		for (;;) {
+			const candidateName = n === 0 ? `${stem}${ext}` : `${stem} ${n}${ext}`;
+			const path = folderPath ? `${folderPath}/${candidateName}` : candidateName;
+			if (!this.app.vault.getAbstractFileByPath(path)) return path;
+			n++;
 		}
 	}
 
@@ -270,10 +448,74 @@ export class GalleryView extends ItemView {
 		}
 		try {
 			await this.client.delete(obj.key);
+			this.selected.delete(obj.key);
+			this.entries.delete(obj.key);
 			cell.remove();
+			this.updateSelectionUi();
 		} catch (e) {
 			new Notice(e instanceof Error ? e.message : String(e));
 		}
+	}
+
+	private async deleteSelected(): Promise<void> {
+		if (!this.client || this.selected.size === 0) return;
+		const keys = [...this.selected];
+		const items = keys
+			.map((k) => this.entries.get(k))
+			.filter((e): e is GalleryEntry => !!e);
+
+		const usedNotes = new Set<string>();
+		for (const entry of items) {
+			const usage = await findNotesUsingUrl(this.app, entry.url);
+			for (const p of usage) usedNotes.add(p);
+		}
+		if (usedNotes.size > 0) {
+			showUsage(this.app, [...usedNotes]);
+			const ok = await confirm(
+				this.app,
+				t('modal.confirmBulkDeleteUsed', { n: items.length, m: usedNotes.size }),
+			);
+			if (!ok) return;
+		} else {
+			const ok = await confirm(
+				this.app,
+				t('modal.confirmBulkDelete', { n: items.length }),
+			);
+			if (!ok) return;
+		}
+
+		const progress = new JobProgress(
+			this.plugin,
+			items.length,
+			'progress.delete',
+			this.plugin.settings.progressCorner,
+		);
+		let failed = 0;
+		try {
+			for (const entry of items) {
+				progress.setCurrent(entry.obj.key.split('/').pop() ?? entry.obj.key);
+				try {
+					await this.client.delete(entry.obj.key);
+					this.selected.delete(entry.obj.key);
+					this.entries.delete(entry.obj.key);
+					entry.cell.remove();
+				} catch (e) {
+					failed++;
+					new Notice(e instanceof Error ? e.message : String(e));
+				} finally {
+					progress.tick();
+				}
+			}
+		} finally {
+			progress.finish();
+		}
+		this.updateSelectionUi();
+		new Notice(
+			t('gallery.bulkDeleteDone', {
+				n: items.length - failed,
+				k: failed,
+			}),
+		);
 	}
 }
 

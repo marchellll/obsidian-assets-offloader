@@ -8,25 +8,31 @@ export const en = {
 	'commands.convertWikiToMd': 'Convert current note wikilinks to markdown links',
 	'commands.convertMdToWiki': 'Convert current note markdown links to wikilinks',
 	'commands.openGallery': 'Open remote asset gallery',
-	'commands.uploadImage': 'Upload image',
-	'commands.localizeImage': 'Localize image',
 
 	'ribbon.gallery': 'Remote asset gallery',
 
+	'settings.sectionGeneral': 'General',
+	'settings.sectionConnection': 'Connection',
+	'settings.connectionSummaryOk': 'Configured — expand to edit',
+	'settings.connectionSummaryBad': 'Incomplete — expand to set up ({fields})',
+	'settings.required': 'Required',
+	'settings.requiredMark': ' (required)',
+	'settings.validationMissing': 'Missing required: {fields}',
 	'settings.bucketUrl': 'Bucket URL',
 	'settings.bucketUrlDesc':
 		'Paste helper. Use Guess from URL to fill endpoint, bucket, region, and path-style.',
 	'settings.guessFromUrl': 'Guess from URL',
 	'settings.provider': 'Provider',
 	'settings.endpoint': 'Endpoint',
-	'settings.endpointDesc': 'S3 API URL, e.g. https://<accountid>.r2.cloudflarestorage.com',
+	'settings.endpointDesc':
+		'S3 API URL, e.g. https://<accountid>.r2.cloudflarestorage.com. Bare hosts get https://.',
 	'settings.region': 'Region',
 	'settings.bucket': 'Bucket',
 	'settings.publicUrlBase': 'Public URL base',
 	'settings.publicUrlBaseDesc':
-		'Origin used in markdown, e.g. https://cdn.example.com. No trailing slash.',
+		'Origin used in markdown, e.g. https://cdn.example.com. No trailing slash. Bare hosts get https://.',
 	'settings.prefix': 'Remote folder prefix',
-	'settings.prefixDesc': 'Optional bucket prefix. Upload path is {prefix}/{YYYYMM}/{objectName}.',
+	'settings.prefixDesc': 'Optional bucket prefix. Upload path is {prefix}/{YYYYMM}/{objectName}. The {YYYYMM} is the year and month of the upload date to keep order, and not updatable.',
 	'settings.accessKey': 'Access key',
 	'settings.secretKey': 'Secret key',
 	'settings.forcePathStyle': 'Force path-style',
@@ -38,8 +44,12 @@ export const en = {
 		'Only after PUT succeeds and the note link was rewritten. Skips files still linked elsewhere.',
 	'settings.localizedLinkStyle': 'Localized link style',
 	'settings.localizedLinkStyleDesc': 'Remote links are always markdown.',
+	'settings.progressCorner': 'Progress toast corner',
+	'settings.progressCornerDesc':
+		'Where upload/localize progress appears (done count, queue remaining, current file).',
 	'settings.testConnection': 'Test connection',
-	'settings.testConnectionDesc': 'Head-bucket or list with max-keys=1.',
+	'settings.testConnectionDesc':
+		'Checks list, put, and get (the ops this plugin needs). Does not delete; overwrites a small probe object under .assets-offloader/.',
 	'settings.providerExtras': 'Provider extra fields',
 	'settings.r2Jurisdiction': 'Jurisdiction',
 	'settings.r2JurisdictionDesc': 'Rewrites the R2 endpoint host for EU / FedRAMP buckets.',
@@ -79,6 +89,11 @@ export const en = {
 	'linkStyle.wikilink': 'Wikilink',
 	'linkStyle.markdown': 'Markdown',
 
+	'progressCorner.topLeft': 'Top left',
+	'progressCorner.topRight': 'Top right',
+	'progressCorner.bottomLeft': 'Bottom left',
+	'progressCorner.bottomRight': 'Bottom right',
+
 	'notices.noSecretStorage':
 		'Secret Storage unavailable. Update Obsidian to 1.11.4+ and enable Secret Storage.',
 	'notices.guessFailed': 'Could not guess S3 fields from that URL.',
@@ -86,8 +101,11 @@ export const en = {
 	'notices.noActiveNote': 'No active markdown file.',
 	'notices.uploadStart': 'Uploading {n} assets…',
 	'notices.uploadDone': 'Uploaded {n}, skipped {m}, failed {k}',
+	'progress.upload': '↑{done} ({queued}){current}',
 	'notices.localizeStart': 'Localizing {n} assets…',
 	'notices.localizeDone': 'Localized {n}, skipped {m}, failed {k}',
+	'progress.localize': '↓{done} ({queued}){current}',
+	'progress.delete': '🗑{done} ({queued}){current}',
 	'notices.testOk': 'Connection OK.',
 	'notices.testFail': 'Connection failed: {error}',
 	'notices.missingConfig': 'Fill endpoint, bucket, and secrets first.',
@@ -96,6 +114,8 @@ export const en = {
 	'notices.deleteSkippedLinked': 'Skipped deleting {path}; still linked from: {notes}',
 	'notices.galleryNeedsPublicBase':
 		'Gallery preview needs a Public URL base for private buckets.',
+	'notices.invalidUrl':
+		'{field} must be an http(s) URL (e.g. https://cdn.example.com). Bare hosts get https://.',
 
 	'modal.failuresTitle': 'Failures',
 	'modal.conflictsTitle': 'Localize conflicts',
@@ -103,16 +123,37 @@ export const en = {
 	'modal.confirmDelete': 'Delete this object from storage? This cannot be undone.',
 	'modal.confirmDeleteUsed':
 		'This object is still referenced by notes. Delete anyway? This cannot be undone.',
+	'modal.confirmBulkDelete': 'Delete {n} objects from storage? This cannot be undone.',
+	'modal.confirmBulkDeleteUsed':
+		'Delete {n} objects? {m} notes still reference some of them. This cannot be undone.',
 	'modal.confirm': 'Confirm',
 	'modal.cancel': 'Cancel',
 	'modal.close': 'Close',
 
 	'gallery.findNotes': 'Find notes that use this',
+	'gallery.preview': 'Preview',
+	'gallery.select': 'Select',
+	'gallery.deselect': 'Deselect',
+	'gallery.selectAll': 'Select all',
+	'gallery.clearSelection': 'Clear',
+	'gallery.selectedNone': 'None selected',
+	'gallery.selectedCount': '{n} selected',
+	'gallery.deleteSelected': 'Delete selected',
+	'gallery.deleteSelectedN': 'Delete selected ({n})',
+	'gallery.bulkDeleteDone': 'Deleted {n}, failed {k}',
+	'gallery.zoomIn': 'Zoom in',
+	'gallery.zoomOut': 'Zoom out',
+	'gallery.zoomReset': 'Reset zoom',
+	'gallery.openInTab': 'Open in new tab',
+	'gallery.closePreview': 'Close',
 	'gallery.download': 'Download',
 	'gallery.localize': 'Localize',
 	'gallery.delete': 'Delete',
 	'gallery.empty': 'No remote assets found.',
 	'gallery.loading': 'Loading…',
+	'gallery.pickFolder': 'Choose folder to save into…',
+	'gallery.downloadCancelled': 'Download cancelled.',
+	'gallery.downloadSaved': 'Saved to {path}',
 } as const;
 
 export type EnKey = keyof typeof en;

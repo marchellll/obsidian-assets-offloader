@@ -37,6 +37,8 @@ export function yyyymm(date = new Date()): string {
 	return `${y}${m}`;
 }
 
+import { normalizeHttpUrl } from './http-url';
+
 /** Full object key: `{prefix?}{YYYYMM}/{uuidv7}-{sanitized}{ext}` */
 export function buildObjectKey(
 	originalFilename: string,
@@ -52,7 +54,10 @@ export function buildObjectKey(
 }
 
 export function buildPublicUrl(publicUrlBase: string, key: string): string {
-	const base = publicUrlBase.replace(/\/+$/, '');
+	const base = normalizeHttpUrl(publicUrlBase);
+	if (!base) {
+		throw new Error(`Invalid public URL base: ${publicUrlBase}`);
+	}
 	const encoded = key
 		.split('/')
 		.map((seg) => encodeURIComponent(seg))

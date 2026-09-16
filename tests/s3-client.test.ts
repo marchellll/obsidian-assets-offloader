@@ -25,12 +25,14 @@ describe('parseListXml', () => {
 });
 
 describe('S3Client', () => {
-	it('put and list via fake transport', async () => {
+	function fakeStore() {
 		const stored = new Map<string, Uint8Array>();
 		const transport = new FakeTransport(async (req) => {
+			const pathKey = decodeURIComponent(
+				new URL(req.url).pathname.split('/').slice(2).join('/'),
+			);
 			if (req.method === 'PUT') {
-				const key = new URL(req.url).pathname.split('/').slice(2).join('/');
-				stored.set(decodeURIComponent(key), req.body ?? new Uint8Array());
+				stored.set(pathKey, req.body ?? new Uint8Array());
 				return { status: 200, headers: {}, body: new Uint8Array() };
 			}
 			if (req.method === 'GET' && req.url.includes('list-type')) {
@@ -43,12 +45,29 @@ describe('S3Client', () => {
 					body: new TextEncoder().encode(xml),
 				};
 			}
+			if (req.method === 'GET') {
+				const body = stored.get(pathKey);
+				if (!body) {
+					return { status: 404, headers: {}, body: new TextEncoder().encode('no') };
+				}
+				return { status: 200, headers: {}, body };
+			}
 			return { status: 404, headers: {}, body: new TextEncoder().encode('no') };
 		});
-		const client = new S3Client(conn, transport);
+		return { stored, client: new S3Client(conn, transport) };
+	}
+
+	it('put and list via fake transport', async () => {
+		const { client } = fakeStore();
 		await client.put('202609/a.png', new Uint8Array([1, 2, 3]));
 		const list = await client.list({ limit: 10 });
 		expect(list.items.some((i) => i.key.includes('a.png'))).toBe(true);
 		expect(client.publicUrl('202609/a.png')).toBe('https://cdn.example.com/202609/a.png');
+	});
+
+	it('testFullAccess runs list put get without delete', async () => {
+		const { stored, client } = fakeStore();
+		await client.testFullAccess('media');
+		expect(stored.has('media/.assets-offloader/connection-probe.txt')).toBe(true);
 	});
 });

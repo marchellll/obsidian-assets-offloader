@@ -7,6 +7,7 @@ import { App, requestUrl } from 'obsidian';
 import { AwsV4Signer } from 'aws4fetch';
 import { getSecret, hasSecretStorage, type AssetsOffloaderSettings } from '../settings';
 import { buildPublicUrl } from './names';
+import { normalizeHttpUrl } from './http-url';
 
 export interface S3Connection {
 	endpoint: string;
@@ -271,15 +272,23 @@ export function connectionFromSettings(app: App, settings: AssetsOffloaderSettin
 	if (!settings.endpoint.trim() || !settings.bucket.trim()) {
 		throw new Error('Endpoint and bucket required');
 	}
+	const endpoint = normalizeHttpUrl(settings.endpoint);
+	if (!endpoint) {
+		throw new Error(`Invalid endpoint URL: ${settings.endpoint}`);
+	}
 	const session = settings.sessionTokenSecretId
 		? (getSecret(app, settings.sessionTokenSecretId) ?? undefined)
 		: undefined;
-	const publicBase =
+	const rawPublic =
 		settings.provider === 'spaces' && settings.spacesCdnUrl.trim()
-			? settings.spacesCdnUrl.replace(/\/+$/, '')
-			: settings.publicUrlBase.replace(/\/+$/, '');
+			? settings.spacesCdnUrl
+			: settings.publicUrlBase;
+	const publicBase = normalizeHttpUrl(rawPublic) ?? '';
+	if (rawPublic.trim() && !publicBase) {
+		throw new Error(`Invalid public URL base: ${rawPublic}`);
+	}
 	return {
-		endpoint: settings.endpoint.replace(/\/+$/, ''),
+		endpoint,
 		region: signingRegion(settings),
 		bucket: settings.bucket.trim(),
 		forcePathStyle: settings.forcePathStyle,
@@ -358,13 +367,52 @@ export class S3Client {
 		return { ...page, ...(prefixes ? { prefixes } : {}) };
 	}
 
-	/** Head bucket, else list max-keys=1. */
+	/** Head bucket, else list — superseded by full testConnection probe. */
 	async test(): Promise<void> {
-		const headUrl = buildBucketUrl(this.connection);
-		const head = await this.send({ method: 'HEAD', url: headUrl, headers: {} });
-		if (head.status >= 200 && head.status < 300) return;
-		// ponytail: Android/empty-body HEAD flaky → list probe
-		await this.list({ limit: 1 });
+		await this.testFullAccess();
+	}
+
+	/**
+	 * Probe every S3 op the plugin needs: list, put, get.
+	 * Skips delete (overwrite fixed probe key instead).
+	 */
+	async testFullAccess(remotePrefix = ''): Promise<void> {
+		const p = remotePrefix.replace(/^\/+|\/+$/g, '');
+		const probeKey = p
+			? `${p}/.assets-offloader/connection-probe.txt`
+			: `.assets-offloader/connection-probe.txt`;
+
+		try {
+			await this.list({ limit: 1, prefix: p ? `${p}/` : undefined });
+		} catch (e) {
+			throw new Error(
+				`List failed: ${e instanceof Error ? e.message : String(e)}`,
+			);
+		}
+
+		const payload = new TextEncoder().encode(
+			`assets-offloader connection probe ${Date.now()}`,
+		);
+		try {
+			await this.put(probeKey, payload, 'text/plain');
+		} catch (e) {
+			throw new Error(
+				`Put failed: ${e instanceof Error ? e.message : String(e)}`,
+			);
+		}
+
+		let got: Uint8Array;
+		try {
+			got = await this.get(probeKey);
+		} catch (e) {
+			throw new Error(
+				`Get failed: ${e instanceof Error ? e.message : String(e)}`,
+			);
+		}
+		if (got.byteLength !== payload.byteLength || !bytesEqual(got, payload)) {
+			throw new Error('Get failed: downloaded bytes do not match upload');
+		}
+		// ponytail: no DELETE — leave/overwrite probe so tokens without delete still pass
 	}
 
 	publicUrl(key: string): string {
@@ -383,7 +431,18 @@ export function createClient(app: App, settings: AssetsOffloaderSettings): S3Cli
 	return new S3Client(connectionFromSettings(app, settings));
 }
 
-export async function testConnection(app: App, settings: AssetsOffloaderSettings): Promise<void> {
+export async function testConnection(
+	app: App,
+	settings: AssetsOffloaderSettings,
+): Promise<void> {
 	const client = createClient(app, settings);
-	await client.test();
+	await client.testFullAccess(settings.prefix);
+}
+
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+	if (a.byteLength !== b.byteLength) return false;
+	for (let i = 0; i < a.byteLength; i++) {
+		if (a[i] !== b[i]) return false;
+	}
+	return true;
 }

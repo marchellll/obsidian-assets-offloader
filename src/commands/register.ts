@@ -1,22 +1,13 @@
 /**
- * Wire command palette + editor context menu.
+ * Wire command palette entries.
  * Command ids are stable — do not rename after release (see vision.md).
  */
-import { Menu, TFile } from 'obsidian';
 import type AssetsOffloaderPlugin from '../main';
 import { t } from '../i18n';
-import {
-	uploadCurrentNote,
-	uploadCurrentFolder,
-	uploadSingleFile,
-	activeMarkdown,
-	resolveLocal,
-} from './upload';
+import { uploadCurrentNote, uploadCurrentFolder } from './upload';
 import { localizeCurrentNote, localizeCurrentFolder } from './localize';
 import { convertNoteWikiToMd, convertNoteMdToWiki } from './convert-links';
 import { GALLERY_VIEW_TYPE } from '../gallery/view';
-import { matchesWhitelist } from '../s3/whitelist';
-import { parseAssetRefs } from '../links/parse';
 
 export function registerCommands(plugin: AssetsOffloaderPlugin): void {
 	plugin.addCommand({
@@ -58,41 +49,4 @@ export function registerCommands(plugin: AssetsOffloaderPlugin): void {
 			await plugin.app.workspace.revealLeaf(leaf);
 		},
 	});
-
-	plugin.registerEvent(
-		plugin.app.workspace.on('editor-menu', (menu, editor, info) => {
-			const note = info.file ?? activeMarkdown(plugin.app);
-			if (!(note instanceof TFile)) return;
-			const cursor = editor.getCursor();
-			const line = editor.getLine(cursor.line);
-			addImageMenuItems(plugin, menu, note, line);
-		}),
-	);
-}
-
-function addImageMenuItems(
-	plugin: AssetsOffloaderPlugin,
-	menu: Menu,
-	note: TFile,
-	line: string,
-): void {
-	const refs = parseAssetRefs(line);
-	if (refs.length === 0) return;
-	const ref = refs[0]!;
-	if (!ref.isRemote) {
-		const file = resolveLocal(plugin.app, note, ref.target);
-		if (file && matchesWhitelist(file.name, plugin.settings.whitelist)) {
-			menu.addItem((item) => {
-				item.setTitle(t('commands.uploadImage')).onClick(() => {
-					void uploadSingleFile(plugin, note, file);
-				});
-			});
-		}
-	} else {
-		menu.addItem((item) => {
-			item.setTitle(t('commands.localizeImage')).onClick(() => {
-				void localizeCurrentNote(plugin);
-			});
-		});
-	}
 }

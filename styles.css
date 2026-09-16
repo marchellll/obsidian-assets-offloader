@@ -8,6 +8,36 @@ Assets Offloader gallery
 	overflow: auto;
 	height: 100%;
 	padding: 0.5rem;
+	display: flex;
+	flex-direction: column;
+}
+
+.assets-offloader-gallery-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+	padding: 0.35rem 0.25rem 0.65rem;
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: 0.5rem;
+	flex-shrink: 0;
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background: var(--background-primary);
+}
+
+.assets-offloader-gallery-select-info {
+	flex: 1;
+	min-width: 6rem;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+
+.assets-offloader-gallery-toolbar-actions {
+	display: flex;
+	gap: 0.35rem;
+	flex-wrap: wrap;
 }
 
 .assets-offloader-gallery-grid {
@@ -23,8 +53,148 @@ Assets Offloader gallery
 }
 
 .assets-offloader-cell {
+	position: relative;
 	width: 140px;
 	cursor: context-menu;
+}
+
+.assets-offloader-cell.is-selected .assets-offloader-media {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+.assets-offloader-cell-check {
+	position: absolute;
+	top: 0.35rem;
+	left: 0.35rem;
+	z-index: 1;
+	width: 1.1rem;
+	height: 1.1rem;
+	margin: 0;
+	cursor: pointer;
+	accent-color: var(--interactive-accent);
+}
+
+.assets-offloader-cell-previewable {
+	cursor: zoom-in;
+}
+
+/* Full-window gallery media preview */
+.modal.assets-offloader-preview-modal {
+	width: min(96vw, 1400px);
+	max-width: 96vw;
+	height: min(94vh, 1000px);
+	max-height: 94vh;
+}
+
+.modal.assets-offloader-preview-modal .modal-content {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+	overflow: hidden;
+}
+
+.assets-offloader-preview {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+.assets-offloader-preview-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem 0.75rem;
+	border-bottom: 1px solid var(--background-modifier-border);
+	flex-shrink: 0;
+}
+
+.assets-offloader-preview-title {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+
+.assets-offloader-preview-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.15rem;
+}
+
+.assets-offloader-preview-stage {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	background: var(--background-secondary);
+	cursor: pointer;
+}
+
+.assets-offloader-preview-img {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+	transform-origin: center center;
+	user-select: none;
+	-webkit-user-drag: none;
+	cursor: zoom-in;
+}
+
+.assets-offloader-preview-video {
+	max-width: 100%;
+	max-height: 100%;
+	cursor: default;
+}
+
+.assets-offloader-preview-audio {
+	width: min(480px, 90%);
+	cursor: default;
+}
+
+/* Upload / localize progress toast (corner from settings) */
+.assets-offloader-job-toast {
+	position: fixed;
+	z-index: var(--layer-notice, 100);
+	max-width: min(420px, 90vw);
+	padding: 0.55rem 0.85rem;
+	border-radius: var(--radius-m, 6px);
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	box-shadow: var(--shadow-l);
+	font-size: var(--font-ui-small);
+	line-height: 1.35;
+	pointer-events: none;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.assets-offloader-job-toast-top-left {
+	top: 1rem;
+	left: 1rem;
+}
+
+.assets-offloader-job-toast-top-right {
+	top: 1rem;
+	right: 1rem;
+}
+
+.assets-offloader-job-toast-bottom-left {
+	bottom: 2.5rem;
+	left: 1rem;
+}
+
+.assets-offloader-job-toast-bottom-right {
+	bottom: 2.5rem;
+	right: 1rem;
 }
 
 .assets-offloader-media {
@@ -51,4 +221,12 @@ Assets Offloader gallery
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	margin-top: 0.25rem;
+}
+
+.assets-offloader-required-empty input,
+.assets-offloader-invalid-url input,
+input.assets-offloader-required-empty,
+input.assets-offloader-invalid-url {
+	border-color: var(--text-error) !important;
+	box-shadow: 0 0 0 1px var(--text-error);
 }

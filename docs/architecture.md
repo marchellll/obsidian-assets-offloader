@@ -12,10 +12,10 @@ Where to look. Product rules live in [`vision.md`](../vision.md). This file is t
     - **Gallery:** `gallery/view.ts` → `gallery/list.ts` → `s3/client.list`
 
 ```
-User command / ribbon / editor menu
+User command / ribbon
         │
         ▼
- commands/register.ts     (wires palette + context menu)
+ commands/register.ts     (wires command palette)
         │
         ├─ upload.ts ──► parse refs → whitelist → S3 PUT → rewrite links
         ├─ localize.ts ► parse remotes → GET bytes → SHA-256 collide → rewrite
@@ -30,7 +30,7 @@ User command / ribbon / editor menu
 | `src/main.ts`                   | Lifecycle. Keep thin.                                                       |
 | `src/settings.ts`               | Types, defaults, settings tab.                                              |
 | `src/i18n.ts` + `locales/en.ts` | All user-visible strings. Add keys in `en.ts`, call `t('…')`.               |
-| `src/commands/`                 | User actions. `register.ts` = IDs + menus.                                  |
+| `src/commands/`                 | User actions. `register.ts` = command IDs.                                  |
 | `src/s3/`                       | Storage: URL guess, object names, whitelist, signed REST client.            |
 | `src/links/`                    | Parse / rewrite / convert markdown↔wiki / checksum.                         |
 | `src/gallery/`                  | ItemView UI, month paging, “who uses this URL”.                             |
@@ -66,7 +66,7 @@ Secrets: settings store **secret ids** only. At call time `getSecret(app, id)` �
 
 | File               | What                                                                                          |
 | ------------------ | --------------------------------------------------------------------------------------------- |
-| `register.ts`      | Stable command ids + editor-menu Upload/Localize.                                             |
+| `register.ts`      | Stable command ids (palette only).                                                            |
 | `upload.ts`        | Note/folder upload; optional delete via `fileManager.trashFile` (obeys Obsidian trash prefs). |
 | `localize.ts`      | Note/folder download + conflict modal.                                                        |
 | `convert-links.ts` | Thin Obsidian wrapper around `links/convert.ts`.                                              |
