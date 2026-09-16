@@ -1,3 +1,4 @@
+/** List YYYYMM prefixes under the configured remote prefix; list objects in one month. */
 import type { ListedObject, S3Client } from '../s3/client';
 
 export interface MonthPage {

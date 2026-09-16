@@ -1,3 +1,8 @@
+/**
+ * Upload local whitelist assets from the active note (or its folder).
+ * Flow: parse → resolve → PUT → rewrite to public markdown URL → optional trashFile.
+ * trashFile obeys Settings → Files and links → Deleted files (system / .trash / permanent).
+ */
 import { App, Notice, TFile, TFolder } from 'obsidian';
 import type AssetsOffloaderPlugin from '../main';
 import { t } from '../i18n';

@@ -1,4 +1,7 @@
-/** gitignore-style match against file name only (not path), case-insensitive. */
+/**
+ * gitignore-style match against file name only (not full path), case-insensitive.
+ * Supports * / ?, ! negation, # comments, blank lines.
+ */
 export function matchesWhitelist(filename: string, patternsText: string): boolean {
 	const name = filename.split(/[/\\]/).pop() ?? filename;
 	const lower = name.toLowerCase();

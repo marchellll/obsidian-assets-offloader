@@ -1,3 +1,4 @@
+/** Clickable list of note paths that reference a remote asset. */
 import { App, Modal, Setting, TFile } from 'obsidian';
 import { t } from '../i18n';
 

@@ -1,3 +1,4 @@
+/** Confirm / cancel modal. wait() resolves true only if user confirms. */
 import { App, Modal, Setting } from 'obsidian';
 import { t } from '../i18n';
 

@@ -1,3 +1,7 @@
+/**
+ * Download remote http(s) assets into the vault attachment location for a note.
+ * Same basename + same SHA-256 → reuse file; different bytes → conflict modal (no overwrite).
+ */
 import { Notice, TFile, TFolder } from 'obsidian';
 import type AssetsOffloaderPlugin from '../main';
 import { t } from '../i18n';

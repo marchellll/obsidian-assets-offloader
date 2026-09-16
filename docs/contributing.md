@@ -1,5 +1,7 @@
 # Contributing
 
+New to the tree? Read [architecture.md](architecture.md) first (folder map + upload/localize flow).
+
 ## Requirements
 
 - Node.js 18+

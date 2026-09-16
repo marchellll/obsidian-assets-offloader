@@ -1,3 +1,4 @@
+/** Simple scrollable list modal — upload failures or localize conflicts. */
 import { App, Modal, Setting } from 'obsidian';
 import { t } from '../i18n';
 

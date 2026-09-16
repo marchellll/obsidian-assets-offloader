@@ -1,3 +1,8 @@
+/**
+ * S3-compatible client: SigV4 sign (aws4fetch) + Obsidian requestUrl transport.
+ * Mobile-safe (no Node/AWS SDK). PUT hashes body (Android OkHttp / empty HEAD quirks).
+ * Test connection: HEAD bucket, else list max-keys=1.
+ */
 import { App, requestUrl } from 'obsidian';
 import { AwsV4Signer } from 'aws4fetch';
 import { getSecret, hasSecretStorage, type AssetsOffloaderSettings } from '../settings';

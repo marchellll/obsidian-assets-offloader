@@ -1,3 +1,4 @@
+/** Command wrappers: rewrite note link syntax only (no upload/download). */
 import { Notice } from 'obsidian';
 import type AssetsOffloaderPlugin from '../main';
 import { t } from '../i18n';

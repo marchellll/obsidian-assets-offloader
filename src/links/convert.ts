@@ -1,3 +1,4 @@
+/** Pure wiki ↔ markdown conversion (used by commands/convert-links.ts). */
 import type { AssetRef } from './parse';
 import { parseAssetRefs } from './parse';
 import { basenameOf, formatLocalLink, formatRemoteLink, rewriteTargets } from './rewrite';

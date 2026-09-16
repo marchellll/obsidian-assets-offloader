@@ -1,3 +1,7 @@
+/**
+ * Plugin entry. Obsidian loads the bundled main.js → this class.
+ * Keep thin: settings + register commands/gallery. Feature logic lives elsewhere.
+ */
 import { Plugin } from 'obsidian';
 import {
 	AssetsOffloaderSettingTab,
@@ -28,6 +32,8 @@ export default class AssetsOffloaderPlugin extends Plugin {
 	}
 
 	async saveSettings() {
+		// Persists non-secret fields only. Secret values live in Secret Storage;
+		// we only save secret *ids* (accessKeySecretId, etc.).
 		await this.saveData(this.settings);
 	}
 }

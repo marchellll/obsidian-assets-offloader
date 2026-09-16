@@ -1,3 +1,7 @@
+/**
+ * Wire command palette + editor context menu.
+ * Command ids are stable — do not rename after release (see vision.md).
+ */
 import { Menu, TFile } from 'obsidian';
 import type AssetsOffloaderPlugin from '../main';
 import { t } from '../i18n';

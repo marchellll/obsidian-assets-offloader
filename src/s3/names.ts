@@ -1,3 +1,5 @@
+/** Object key helpers: uuidv7 + sanitize + {prefix?}{YYYYMM}/{name} (local calendar). */
+
 /** uuidv7: time-ordered, lowercase canonical. ponytail: local helper, no uuid pkg. */
 export function uuidv7(now = Date.now()): string {
 	const bytes = new Uint8Array(16);

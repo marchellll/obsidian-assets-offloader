@@ -1,3 +1,8 @@
+/**
+ * Remote asset gallery ItemView + ribbon registration.
+ * Months from S3 prefixes; first paint last 5 non-empty; scroll loads older;
+ * IntersectionObserver creates media when a cell nears the viewport.
+ */
 import { ItemView, Menu, Notice, TFile, WorkspaceLeaf } from 'obsidian';
 import type AssetsOffloaderPlugin from '../main';
 import { t } from '../i18n';

@@ -1,3 +1,8 @@
+/**
+ * Settings types, defaults, and Settings → Assets Offloader tab.
+ * Credentials use SecretComponent / secret ids — never raw keys in data.json.
+ * Provider extras re-render when provider changes (display() again).
+ */
 import { App, Notice, PluginSettingTab, SecretComponent, Setting } from 'obsidian';
 import type AssetsOffloaderPlugin from './main';
 import type { EnKey } from './locales/en';

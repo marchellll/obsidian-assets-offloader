@@ -1,3 +1,8 @@
+/**
+ * Guess endpoint/bucket/region/provider from a pasted bucket URL.
+ * First matching host rule wins. Never overwrites secrets or public URL base
+ * (Spaces CDN paste is the exception — that URL is public, not the API endpoint).
+ */
 import type { ProviderId, R2Jurisdiction } from '../settings';
 
 export interface ParseExtras {

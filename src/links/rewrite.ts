@@ -1,3 +1,7 @@
+/**
+ * Format and splice link text. Remote links always markdown; local follows setting.
+ * Unsafe local markdown paths get encodeURI / <> wrapping so spaces and () don't break.
+ */
 import type { LocalizedLinkStyle } from '../settings';
 import type { AssetRef } from './parse';
 

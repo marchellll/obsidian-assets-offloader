@@ -1,3 +1,7 @@
+/**
+ * Find image/file embeds and links in note markdown (markdown + wikilink).
+ * Offsets (start/end) support later rewrite without re-scanning blindly.
+ */
 export type LinkKind = 'markdown' | 'wikilink';
 
 export interface AssetRef {

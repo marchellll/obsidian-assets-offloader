@@ -1,3 +1,4 @@
+/** SHA-256 of bytes — localize uses this to decide same-file vs conflict. */
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
 	const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
 	return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');

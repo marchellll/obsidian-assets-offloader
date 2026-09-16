@@ -33,7 +33,9 @@ See [docs/r2-setup.md](docs/r2-setup.md).
 
 ## Development
 
-See [docs/contributing.md](docs/contributing.md) and [docs/releasing.md](docs/releasing.md).
+- [Codebase map](docs/architecture.md) — what lives where
+- [Contributing](docs/contributing.md)
+- [Releasing](docs/releasing.md)
 
 ```bash
 npm i

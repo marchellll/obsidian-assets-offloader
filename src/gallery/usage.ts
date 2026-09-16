@@ -1,3 +1,4 @@
+/** Vault-wide scan: which notes reference a public URL (and encoded variants). */
 import type { App } from 'obsidian';
 import { TFile } from 'obsidian';
 import { parseAssetRefs } from '../links/parse';
