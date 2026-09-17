@@ -5,7 +5,7 @@
 	"minAppVersion": "1.11.4",
 	"description": "Upload vault attachments to S3-compatible storage and swap links; localize them back.",
 	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
+	"authorUrl": "https://marchell.xyz",
 	"isDesktopOnly": false,
-	"fundingUrl": "buymeacoffee.com/marchell"
+	"fundingUrl": "https://buymeacoffee.com/marchell"
 }
