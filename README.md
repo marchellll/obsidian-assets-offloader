@@ -24,25 +24,36 @@ R2 field-by-field (endpoint host, CORS, token): [docs/r2-setup.md](./docs/r2-set
 
 **Upload.** Open a markdown note that embeds local files (`![[photo.png]]` or `![](photo.png)`). Run **Upload current note's local assets**. Matching whitelist files go to `{prefix}/{YYYYMM}/{name}` in the bucket, and the note links become markdown URLs under **Public URL base**. **Upload current folder's local assets** does the same for every note in the current folder (not recursive).
 
-![Note before and after upload](./images/upload.png)
+![Upload](./images/upload.mp4)
 
 **Optional delete.** If **Delete local file after successful upload** is on, the plugin trashes the local file only after PUT succeeds and the note was rewritten, and only if nothing else still links to that file.
 
+**Localize.** Run **Localize current note's assets** (or the folder command) to download remote files using Obsidian’s attachment folder rules and rewrite links back to local paths.
+
+![Localize](./images/localize.mp4)
+
 **Gallery.** The ribbon (or **Open remote asset gallery**) lists objects in the bucket by month. Open a file to preview it, insert a link, or download it into the vault.
 
-![Remote asset gallery](./images/gallery.png)
-
-**Localize.** Run **Localize current note's assets** (or the folder command) to download remote files using Obsidian’s attachment folder rules and rewrite links back to local paths.
+![Remote asset gallery](./images/gallery.mp4)
 
 **Convert links.** The convert commands only change wikilink vs markdown syntax. They do not upload or download. Markdown→wiki leaves `http(s)` links alone.
 
-## Network and privacy
+## Network use
 
-The plugin only talks to the bucket you configure, over HTTPS: list, put, get, delete, head, and a connection test. Credentials go to that endpoint. There is no telemetry.
+This plugin makes **no calls to a vendor we operate**. There is no telemetry, analytics, or auto-update channel. Every request is one you opt into by configuring a bucket and running a command or opening the gallery.
 
-The connection test overwrites a small probe object under `.assets-offloader/` in the bucket. It does not delete.
+| Remote host | Why |
+| --- | --- |
+| **S3 API endpoint** you set (e.g. `https://<accountid>.r2.cloudflarestorage.com`) | Signed HTTPS `list` / `put` / `get` / `delete` / `head` so the plugin can upload, list the gallery, download objects, and run **Test connection**. Access key and secret go only to this host. |
+| **Public URL base** you set (e.g. `https://cdn.example.com`) | Unsigned HTTPS GET so localize can pull file bytes, and so the gallery / note preview can display images, video, and audio. |
+
+**Test connection** overwrites a small probe object under `.assets-offloader/` in the bucket. It does not delete.
 
 If gallery thumbnails or in-note media fail to load, the **Public URL base** host needs CORS that allows GET from Obsidian (desktop is often `app://obsidian.md`).
+
+## Vault files
+
+Local reads and writes stay **inside the vault**: markdown, attachments, and Obsidian’s trash (when delete-after-upload is on). The plugin does not read or write files on disk outside the vault. Remote objects live in your bucket, not on your machine, until you localize them.
 
 ## Commands
 
@@ -71,4 +82,4 @@ Copy `main.js`, `manifest.json`, and `styles.css` into `<Vault>/.obsidian/plugin
 
 ## License
 
-0-BSD
+[MIT](./LICENSE)

@@ -17,7 +17,7 @@
 		"prepare": "husky"
 	},
 	"keywords": [],
-	"license": "0-BSD",
+	"license": "MIT",
 	"dependencies": {
 		"aws4fetch": "^1.0.20"
 	},
