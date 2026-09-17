@@ -6,5 +6,6 @@
 	"description": "Upload vault attachments to S3-compatible storage and swap links; localize them back.",
 	"author": "Obsidian",
 	"authorUrl": "https://obsidian.md",
-	"isDesktopOnly": false
+	"isDesktopOnly": false,
+	"fundingUrl": "buymeacoffee.com/marchell"
 }

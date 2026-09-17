@@ -1,23 +1,48 @@
 # Assets Offloader
 
-Upload vault attachments to S3-compatible storage (Cloudflare R2 is documented), rewrite note links to public URLs, and pull those files back into the vault.
+Keep vault notes light by uploading attachments (images, video, audio, PDF, zip, and other whitelist types) to **your** S3-compatible bucket, rewriting note links to public URLs, and downloading those files back when you want them local again.
 
-Desktop and mobile. Needs Obsidian 1.11.4+ for Secret Storage. Access keys stay out of `data.json`.
+Works on desktop and mobile. Needs **Obsidian 1.11.4+** (Secret Storage). Access keys are never written to `data.json`.
 
-Network use is only S3-compatible HTTPS to the bucket you configure: list, put, get, delete, head, and a connection test.
+Cloudflare R2 is the documented target. Other S3-compatible providers work if you fill endpoint, bucket, region, and a public URL base.
 
-## Features
+## Setup
 
-- Upload whitelist files from the current note or the current folder (not recursive)
-- Download remote files back using Obsidian’s attachment folder rules
-- Extension whitelist (gitignore-style)
-- Remote gallery (monthly folders, lazy media)
-- Convert wikilinks ↔ markdown (syntax only)
-- Guess S3 fields from a pasted bucket URL
+1. Create a bucket and a public origin (custom domain or provider public URL). That origin is **Public URL base** in the plugin — no trailing slash.
+2. Create API keys with object list, read, write, and delete.
+3. In Obsidian, open **Settings → Assets Offloader**.
+4. Paste a bucket URL into **Bucket URL** and select **Guess from URL**, or fill **Endpoint**, **Bucket**, and **Region** by hand.
+5. Set **Public URL base** to the public origin from step 1.
+6. Pick **Access key** and **Secret key** in Secret Storage (do not paste them into plain settings text).
+7. Select **Test connection**. You should see a success notice.
 
-## Setup (R2)
+![Settings → Assets Offloader](./images/settings.png)
 
-[docs/r2-setup.md](docs/r2-setup.md)
+R2 field-by-field (endpoint host, CORS, token): [docs/r2-setup.md](./docs/r2-setup.md).
+
+## How to use
+
+**Upload.** Open a markdown note that embeds local files (`![[photo.png]]` or `![](photo.png)`). Run **Upload current note's local assets**. Matching whitelist files go to `{prefix}/{YYYYMM}/{name}` in the bucket, and the note links become markdown URLs under **Public URL base**. **Upload current folder's local assets** does the same for every note in the current folder (not recursive).
+
+![Note before and after upload](./images/upload.png)
+
+**Optional delete.** If **Delete local file after successful upload** is on, the plugin trashes the local file only after PUT succeeds and the note was rewritten, and only if nothing else still links to that file.
+
+**Gallery.** The ribbon (or **Open remote asset gallery**) lists objects in the bucket by month. Open a file to preview it, insert a link, or download it into the vault.
+
+![Remote asset gallery](./images/gallery.png)
+
+**Localize.** Run **Localize current note's assets** (or the folder command) to download remote files using Obsidian’s attachment folder rules and rewrite links back to local paths.
+
+**Convert links.** The convert commands only change wikilink vs markdown syntax. They do not upload or download. Markdown→wiki leaves `http(s)` links alone.
+
+## Network and privacy
+
+The plugin only talks to the bucket you configure, over HTTPS: list, put, get, delete, head, and a connection test. Credentials go to that endpoint. There is no telemetry.
+
+The connection test overwrites a small probe object under `.assets-offloader/` in the bucket. It does not delete.
+
+If gallery thumbnails or in-note media fail to load, the **Public URL base** host needs CORS that allows GET from Obsidian (desktop is often `app://obsidian.md`).
 
 ## Commands
 
@@ -33,14 +58,16 @@ Network use is only S3-compatible HTTPS to the bucket you configure: list, put, 
 
 ## Development
 
-- [Codebase map](docs/architecture.md)
-- [Contributing](docs/contributing.md)
-- [Releasing](docs/releasing.md)
+- [Codebase map](./docs/architecture.md)
+- [Contributing](./docs/contributing.md)
+- [Releasing](./docs/releasing.md)
 
 ```bash
 npm i
 npm run dev
 ```
+
+Copy `main.js`, `manifest.json`, and `styles.css` into `<Vault>/.obsidian/plugins/obsidian-assets-offloader/`, then reload Obsidian.
 
 ## License
 
