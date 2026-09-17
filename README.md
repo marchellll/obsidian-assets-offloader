@@ -42,10 +42,10 @@ R2 field-by-field (endpoint host, CORS, token): [docs/r2-setup.md](./docs/r2-set
 
 This plugin makes **no calls to a vendor we operate**. There is no telemetry, analytics, or auto-update channel. Every request is one you opt into by configuring a bucket and running a command or opening the gallery.
 
-| Remote host | Why |
-| --- | --- |
+| Remote host                                                                       | Why                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **S3 API endpoint** you set (e.g. `https://<accountid>.r2.cloudflarestorage.com`) | Signed HTTPS `list` / `put` / `get` / `delete` / `head` so the plugin can upload, list the gallery, download objects, and run **Test connection**. Access key and secret go only to this host. |
-| **Public URL base** you set (e.g. `https://cdn.example.com`) | Unsigned HTTPS GET so localize can pull file bytes, and so the gallery / note preview can display images, video, and audio. |
+| **Public URL base** you set (e.g. `https://cdn.example.com`)                      | Unsigned HTTPS GET so localize can pull file bytes, and so the gallery / note preview can display images, video, and audio.                                                                    |
 
 **Test connection** overwrites a small probe object under `.assets-offloader/` in the bucket. It does not delete.
 
