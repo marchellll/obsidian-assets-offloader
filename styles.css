@@ -241,14 +241,6 @@ Assets Offloader gallery
 	margin-top: 0.25rem;
 }
 
-.assets-offloader-required-empty input,
-.assets-offloader-invalid-url input,
-input.assets-offloader-required-empty,
-input.assets-offloader-invalid-url {
-	border-color: var(--text-error) !important;
-	box-shadow: 0 0 0 1px var(--text-error);
-}
-
 .assets-offloader-list-modal-body {
 	user-select: text;
 	-webkit-user-select: text;

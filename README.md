@@ -2,7 +2,7 @@
 
 Keep vault notes light by uploading attachments (images, video, audio, PDF, zip, and other whitelist types) to **your** S3-compatible bucket, rewriting note links to public URLs, and downloading those files back when you want them local again.
 
-Works on desktop and mobile. Needs **Obsidian 1.11.4+** (Secret Storage). Access keys are never written to `data.json`.
+Works on desktop and mobile. Needs **Obsidian 1.13.0+** (settings search + Secret Storage). Access keys are never written to `data.json`.
 
 Cloudflare R2 is the documented target. Other S3-compatible providers work if you fill endpoint, bucket, region, and a public URL base.
 

@@ -96,7 +96,7 @@ export const en = {
 	'progressCorner.bottomRight': 'Bottom right',
 
 	'notices.noSecretStorage':
-		'Secret Storage unavailable. Update Obsidian to 1.11.4+ and enable Secret Storage.',
+		'Secret Storage unavailable. Update Obsidian to 1.13.0+ and enable Secret Storage.',
 	'notices.guessFailed': 'Could not guess S3 fields from that URL.',
 	'notices.guessed': 'Guessed {provider}: bucket {bucket}',
 	'notices.noActiveNote': 'No active markdown file.',
