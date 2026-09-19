@@ -204,30 +204,29 @@ export async function localizeCurrentFolder(
 			if (!ok) return;
 		}
 
-		let total = 0;
-		const work: TFile[] = [];
-		for (const f of files) {
-			const body = await plugin.app.vault.cachedRead(f);
-			const urls = remoteTargets(body);
-			if (urls.length > 0) {
-				total += urls.length;
-				work.push(f);
-			}
-		}
-		if (total === 0) {
-			new Notice(t('notices.localizeDone', { n: 0, m: 0, k: 0 }));
-			return;
-		}
-
 		const progress = new JobProgress(
 			plugin,
-			total,
+			0,
 			'progress.localize',
 			plugin.settings.progressCorner,
 		);
+		progress.setCurrent(t('progress.scanning'));
+		const work: TFile[] = [];
 		const allConflicts: LocalizeConflict[] = [];
 		const agg = { ok: 0, skipped: 0, failed: 0, errors: [] as string[] };
 		try {
+			for (const f of files) {
+				const body = await plugin.app.vault.cachedRead(f);
+				const urls = remoteTargets(body);
+				if (urls.length > 0) {
+					progress.addToQueue(urls.length);
+					work.push(f);
+				}
+			}
+			if (work.length === 0) {
+				new Notice(t('notices.localizeDone', { n: 0, m: 0, k: 0 }));
+				return;
+			}
 			for (const f of work) {
 				const stats = await localizeNote(plugin, f, { progress, quiet: true });
 				agg.ok += stats.ok;
