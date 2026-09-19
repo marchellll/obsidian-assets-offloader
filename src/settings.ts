@@ -65,6 +65,7 @@ export const DEFAULT_WHITELIST = `*.avif
 *.mpeg
 *.mpg
 *.mts
+*.m4a
 *.ogg
 *.wav
 *.webm
