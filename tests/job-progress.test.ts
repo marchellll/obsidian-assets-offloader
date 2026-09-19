@@ -62,7 +62,9 @@ describe('JobProgress', () => {
 		expect(el.text).toBe(t('progress.scanning'));
 
 		progress.addToQueue(2);
-		expect(el.text).toBe(t('progress.upload', { done: 0, queued: 2, current: ` ${t('progress.scanning')}` }));
+		expect(el.text).toBe(
+			t('progress.upload', { done: 0, queued: 2, current: ` ${t('progress.scanning')}` }),
+		);
 
 		progress.setCurrent('a.png');
 		progress.tick();
