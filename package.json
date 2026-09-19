@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-assets-offloader",
-	"version": "1.0.4",
+	"version": "1.0.5",
 	"description": "Upload vault attachments to S3-compatible storage and swap links; localize them back.",
 	"main": "main.js",
 	"type": "module",
