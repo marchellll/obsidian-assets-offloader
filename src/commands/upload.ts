@@ -276,29 +276,28 @@ export async function uploadCurrentFolder(
 			return;
 		}
 
-		let total = 0;
-		const work: TFile[] = [];
-		for (const f of files) {
-			const body = await plugin.app.vault.cachedRead(f);
-			const { byPath } = collectUploadables(plugin, f, body);
-			if (byPath.size > 0) {
-				total += byPath.size;
-				work.push(f);
-			}
-		}
-		if (total === 0) {
-			new Notice(t('notices.uploadDone', { n: 0, m: 0, k: 0 }));
-			return;
-		}
-
 		const progress = new JobProgress(
 			plugin,
-			total,
+			0,
 			'progress.upload',
 			plugin.settings.progressCorner,
 		);
+		progress.setCurrent(t('progress.scanning'));
+		const work: TFile[] = [];
 		const agg: UploadStats = { uploaded: 0, skipped: 0, failed: 0, errors: [] };
 		try {
+			for (const f of files) {
+				const body = await plugin.app.vault.cachedRead(f);
+				const { byPath } = collectUploadables(plugin, f, body);
+				if (byPath.size > 0) {
+					progress.addToQueue(byPath.size);
+					work.push(f);
+				}
+			}
+			if (work.length === 0) {
+				new Notice(t('notices.uploadDone', { n: 0, m: 0, k: 0 }));
+				return;
+			}
 			for (const f of work) {
 				const s = await uploadNote(plugin, f, { progress, quiet: true, client });
 				agg.uploaded += s.uploaded;

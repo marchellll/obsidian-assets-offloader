@@ -180,7 +180,10 @@ Assets Offloader gallery
 /* Upload / localize progress toast (corner from settings) */
 .assets-offloader-job-toast {
 	position: fixed;
-	z-index: var(--layer-notice, 100);
+	/* Fallback if a corner class is missing — still on-screen. */
+	bottom: 2.5rem;
+	right: 1rem;
+	z-index: var(--layer-popover, 1000);
 	max-width: min(420px, 90vw);
 	padding: 0.55rem 0.85rem;
 	border-radius: var(--radius-m, 6px);

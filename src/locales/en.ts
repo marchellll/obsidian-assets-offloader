@@ -107,6 +107,7 @@ export const en = {
 	'notices.uploadStart': 'Uploading {n} assets…',
 	'notices.uploadDone': 'Uploaded {n}, skipped {m}, failed {k}',
 	'progress.upload': '↑{done} ({queued}){current}',
+	'progress.scanning': 'Scanning…',
 	'notices.localizeStart': 'Localizing {n} assets…',
 	'notices.localizeDone': 'Localized {n}, skipped {m}, failed {k}',
 	'progress.localize': '↓{done} ({queued}){current}',
