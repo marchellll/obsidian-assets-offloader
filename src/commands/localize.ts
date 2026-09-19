@@ -15,6 +15,7 @@ import { basenameOf, formatLocalLink, rewriteTargets } from '../links/rewrite';
 import { sameChecksum } from '../links/checksum';
 import { showConflicts, showFailures } from '../ui/conflict-modal';
 import { JobProgress } from '../ui/job-progress';
+import { runExclusive } from '../job-lock';
 import { activeMarkdown } from './upload';
 
 export interface LocalizeConflict {
@@ -170,69 +171,73 @@ async function localizeNote(
 }
 
 export async function localizeCurrentNote(plugin: AssetsOffloaderPlugin): Promise<void> {
-	const note = activeMarkdown(plugin.app);
-	if (!note) {
-		new Notice(t('notices.noActiveNote'));
-		return;
-	}
-	const stats = await localizeNote(plugin, note);
-	if (stats.conflicts.length) {
-		showConflicts(
-			plugin.app,
-			stats.conflicts.map((c) => `${c.note}\n  ${c.url}\n  → ${c.existingPath}`),
-		);
-	}
+	await runExclusive(async () => {
+		const note = activeMarkdown(plugin.app);
+		if (!note) {
+			new Notice(t('notices.noActiveNote'));
+			return;
+		}
+		const stats = await localizeNote(plugin, note);
+		if (stats.conflicts.length) {
+			showConflicts(
+				plugin.app,
+				stats.conflicts.map((c) => `${c.note}\n  ${c.url}\n  → ${c.existingPath}`),
+			);
+		}
+	});
 }
 
 export async function localizeCurrentFolder(plugin: AssetsOffloaderPlugin): Promise<void> {
-	const note = activeMarkdown(plugin.app);
-	const folder: TFolder | null = note?.parent ?? plugin.app.vault.getRoot();
-	const files = folder.children.filter(
-		(f): f is TFile => f instanceof TFile && f.extension === 'md',
-	);
-
-	let total = 0;
-	const work: TFile[] = [];
-	for (const f of files) {
-		const body = await plugin.app.vault.cachedRead(f);
-		const urls = remoteTargets(body);
-		if (urls.length > 0) {
-			total += urls.length;
-			work.push(f);
-		}
-	}
-	if (total === 0) {
-		new Notice(t('notices.localizeDone', { n: 0, m: 0, k: 0 }));
-		return;
-	}
-
-	const progress = new JobProgress(
-		plugin,
-		total,
-		'progress.localize',
-		plugin.settings.progressCorner,
-	);
-	const allConflicts: LocalizeConflict[] = [];
-	const agg = { ok: 0, skipped: 0, failed: 0, errors: [] as string[] };
-	try {
-		for (const f of work) {
-			const stats = await localizeNote(plugin, f, { progress, quiet: true });
-			agg.ok += stats.ok;
-			agg.skipped += stats.skipped;
-			agg.failed += stats.failed;
-			agg.errors.push(...stats.errors);
-			allConflicts.push(...stats.conflicts);
-		}
-	} finally {
-		progress.finish();
-	}
-
-	new Notice(t('notices.localizeDone', { n: agg.ok, m: agg.skipped, k: agg.failed }));
-	if (agg.errors.length) showFailures(plugin.app, agg.errors);
-	if (allConflicts.length) {
-		showConflicts(
-			plugin.app,
-			allConflicts.map((c) => `${c.note}\n  ${c.url}\n  → ${c.existingPath}`),
+	await runExclusive(async () => {
+		const note = activeMarkdown(plugin.app);
+		const folder: TFolder | null = note?.parent ?? plugin.app.vault.getRoot();
+		const files = folder.children.filter(
+			(f): f is TFile => f instanceof TFile && f.extension === 'md',
 		);
-	}
+
+		let total = 0;
+		const work: TFile[] = [];
+		for (const f of files) {
+			const body = await plugin.app.vault.cachedRead(f);
+			const urls = remoteTargets(body);
+			if (urls.length > 0) {
+				total += urls.length;
+				work.push(f);
+			}
+		}
+		if (total === 0) {
+			new Notice(t('notices.localizeDone', { n: 0, m: 0, k: 0 }));
+			return;
+		}
+
+		const progress = new JobProgress(
+			plugin,
+			total,
+			'progress.localize',
+			plugin.settings.progressCorner,
+		);
+		const allConflicts: LocalizeConflict[] = [];
+		const agg = { ok: 0, skipped: 0, failed: 0, errors: [] as string[] };
+		try {
+			for (const f of work) {
+				const stats = await localizeNote(plugin, f, { progress, quiet: true });
+				agg.ok += stats.ok;
+				agg.skipped += stats.skipped;
+				agg.failed += stats.failed;
+				agg.errors.push(...stats.errors);
+				allConflicts.push(...stats.conflicts);
+			}
+		} finally {
+			progress.finish();
+		}
+
+		new Notice(t('notices.localizeDone', { n: agg.ok, m: agg.skipped, k: agg.failed }));
+		if (agg.errors.length) showFailures(plugin.app, agg.errors);
+		if (allConflicts.length) {
+			showConflicts(
+				plugin.app,
+				allConflicts.map((c) => `${c.note}\n  ${c.url}\n  → ${c.existingPath}`),
+			);
+		}
+	});
 }

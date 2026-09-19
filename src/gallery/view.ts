@@ -16,6 +16,7 @@ import { confirm } from '../ui/confirm-modal';
 import { pickVaultFolder } from '../ui/folder-suggest-modal';
 import { openMediaPreview } from '../ui/media-preview-modal';
 import { JobProgress } from '../ui/job-progress';
+import { runExclusive } from '../job-lock';
 import { parseAssetRefs } from '../links/parse';
 import { persistLinkRewrite } from '../links/persist';
 import { basenameOf, formatLocalLink, rewriteTargets } from '../links/rewrite';
@@ -521,76 +522,81 @@ export class GalleryView extends ItemView {
 	}
 
 	private async deleteObject(obj: ListedObject, url: string, _cell: HTMLElement): Promise<void> {
-		if (!this.client) return;
-		const usage = await findNotesUsingUrl(this.app, url);
-		if (usage.length > 0) {
-			showUsage(this.app, usage);
-			const ok = await confirm(this.app, t('modal.confirmDeleteUsed'));
-			if (!ok) return;
-		} else {
-			const ok = await confirm(this.app, t('modal.confirmDelete'));
-			if (!ok) return;
-		}
-		try {
-			await this.client.delete(obj.key);
-			this.removeEntry(obj.key);
-		} catch (e) {
-			new Notice(e instanceof Error ? e.message : String(e));
-		}
+		await runExclusive(async () => {
+			if (!this.client) return;
+			const usage = await findNotesUsingUrl(this.app, url);
+			if (usage.length > 0) {
+				showUsage(this.app, usage);
+				const ok = await confirm(this.app, t('modal.confirmDeleteUsed'));
+				if (!ok) return;
+			} else {
+				const ok = await confirm(this.app, t('modal.confirmDelete'));
+				if (!ok) return;
+			}
+			try {
+				await this.client.delete(obj.key);
+				this.removeEntry(obj.key);
+			} catch (e) {
+				new Notice(e instanceof Error ? e.message : String(e));
+			}
+		});
 	}
 
 	private async deleteSelected(): Promise<void> {
-		if (!this.client || this.selected.size === 0) return;
-		const keys = [...this.selected];
-		const items = keys.map((k) => this.entries.get(k)).filter((e): e is GalleryEntry => !!e);
+		await runExclusive(async () => {
+			const client = this.client;
+			if (!client || this.selected.size === 0) return;
+			const keys = [...this.selected];
+			const items = keys.map((k) => this.entries.get(k)).filter((e): e is GalleryEntry => !!e);
 
-		const usedNotes = new Set<string>();
-		for (const entry of items) {
-			const usage = await findNotesUsingUrl(this.app, entry.url);
-			for (const p of usage) usedNotes.add(p);
-		}
-		if (usedNotes.size > 0) {
-			showUsage(this.app, [...usedNotes]);
-			const ok = await confirm(
-				this.app,
-				t('modal.confirmBulkDeleteUsed', { n: items.length, m: usedNotes.size }),
-			);
-			if (!ok) return;
-		} else {
-			const ok = await confirm(this.app, t('modal.confirmBulkDelete', { n: items.length }));
-			if (!ok) return;
-		}
-
-		const progress = new JobProgress(
-			this.plugin,
-			items.length,
-			'progress.delete',
-			this.plugin.settings.progressCorner,
-		);
-		let failed = 0;
-		try {
+			const usedNotes = new Set<string>();
 			for (const entry of items) {
-				progress.setCurrent(entry.obj.key.split('/').pop() ?? entry.obj.key);
-				try {
-					await this.client.delete(entry.obj.key);
-					this.removeEntry(entry.obj.key);
-				} catch (e) {
-					failed++;
-					new Notice(e instanceof Error ? e.message : String(e));
-				} finally {
-					progress.tick();
-				}
+				const usage = await findNotesUsingUrl(this.app, entry.url);
+				for (const p of usage) usedNotes.add(p);
 			}
-		} finally {
-			progress.finish();
-		}
-		this.updateSelectionUi();
-		new Notice(
-			t('gallery.bulkDeleteDone', {
-				n: items.length - failed,
-				k: failed,
-			}),
-		);
+			if (usedNotes.size > 0) {
+				showUsage(this.app, [...usedNotes]);
+				const ok = await confirm(
+					this.app,
+					t('modal.confirmBulkDeleteUsed', { n: items.length, m: usedNotes.size }),
+				);
+				if (!ok) return;
+			} else {
+				const ok = await confirm(this.app, t('modal.confirmBulkDelete', { n: items.length }));
+				if (!ok) return;
+			}
+
+			const progress = new JobProgress(
+				this.plugin,
+				items.length,
+				'progress.delete',
+				this.plugin.settings.progressCorner,
+			);
+			let failed = 0;
+			try {
+				for (const entry of items) {
+					progress.setCurrent(entry.obj.key.split('/').pop() ?? entry.obj.key);
+					try {
+						await client.delete(entry.obj.key);
+						this.removeEntry(entry.obj.key);
+					} catch (e) {
+						failed++;
+						new Notice(e instanceof Error ? e.message : String(e));
+					} finally {
+						progress.tick();
+					}
+				}
+			} finally {
+				progress.finish();
+			}
+			this.updateSelectionUi();
+			new Notice(
+				t('gallery.bulkDeleteDone', {
+					n: items.length - failed,
+					k: failed,
+				}),
+			);
+		});
 	}
 }
 

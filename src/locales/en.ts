@@ -101,6 +101,7 @@ export const en = {
 	'notices.guessFailed': 'Could not guess S3 fields from that URL.',
 	'notices.guessed': 'Guessed {provider}: bucket {bucket}',
 	'notices.noActiveNote': 'No active markdown file.',
+	'notices.jobBusy': 'Already running. Wait until the current job finishes.',
 	'notices.uploadStart': 'Uploading {n} assets…',
 	'notices.uploadDone': 'Uploaded {n}, skipped {m}, failed {k}',
 	'progress.upload': '↑{done} ({queued}){current}',

@@ -21,6 +21,7 @@ import { persistLinkRewrite, mayTrashLocalAfterUpload } from '../links/persist';
 import { basenameOf, formatRemoteLink, rewriteTargets } from '../links/rewrite';
 import { showFailures } from '../ui/conflict-modal';
 import { JobProgress } from '../ui/job-progress';
+import { runExclusive } from '../job-lock';
 
 function activeMarkdown(app: App): TFile | null {
 	const f = app.workspace.getActiveFile();
@@ -226,85 +227,89 @@ async function uploadNote(
 }
 
 export async function uploadCurrentNote(plugin: AssetsOffloaderPlugin): Promise<void> {
-	const note = activeMarkdown(plugin.app);
-	if (!note) {
-		new Notice(t('notices.noActiveNote'));
-		return;
-	}
-	await uploadNote(plugin, note);
+	await runExclusive(async () => {
+		const note = activeMarkdown(plugin.app);
+		if (!note) {
+			new Notice(t('notices.noActiveNote'));
+			return;
+		}
+		await uploadNote(plugin, note);
+	});
 }
 
 export async function uploadCurrentFolder(plugin: AssetsOffloaderPlugin): Promise<void> {
-	const note = activeMarkdown(plugin.app);
-	const folder: TFolder | null = note?.parent ?? plugin.app.vault.getRoot();
-	const files = folder.children.filter(
-		(f): f is TFile => f instanceof TFile && f.extension === 'md',
-	);
-	if (files.length === 0) {
-		new Notice(t('notices.noActiveNote'));
-		return;
-	}
-
-	if (!hasSecretStorage(plugin.app)) {
-		new Notice(t('notices.noSecretStorage'));
-		return;
-	}
-	const missing = missingConnectionFields(plugin.settings);
-	if (missing.length > 0) {
-		new Notice(t('settings.validationMissing', { fields: missing.join(', ') }));
-		return;
-	}
-
-	let client: S3Client;
-	try {
-		client = createClient(plugin.app, plugin.settings);
-	} catch (e) {
-		new Notice(e instanceof Error ? e.message : String(e));
-		return;
-	}
-
-	let total = 0;
-	const work: TFile[] = [];
-	for (const f of files) {
-		const body = await plugin.app.vault.cachedRead(f);
-		const { byPath } = collectUploadables(plugin, f, body);
-		if (byPath.size > 0) {
-			total += byPath.size;
-			work.push(f);
+	await runExclusive(async () => {
+		const note = activeMarkdown(plugin.app);
+		const folder: TFolder | null = note?.parent ?? plugin.app.vault.getRoot();
+		const files = folder.children.filter(
+			(f): f is TFile => f instanceof TFile && f.extension === 'md',
+		);
+		if (files.length === 0) {
+			new Notice(t('notices.noActiveNote'));
+			return;
 		}
-	}
-	if (total === 0) {
-		new Notice(t('notices.uploadDone', { n: 0, m: 0, k: 0 }));
-		return;
-	}
 
-	const progress = new JobProgress(
-		plugin,
-		total,
-		'progress.upload',
-		plugin.settings.progressCorner,
-	);
-	const agg: UploadStats = { uploaded: 0, skipped: 0, failed: 0, errors: [] };
-	try {
-		for (const f of work) {
-			const s = await uploadNote(plugin, f, { progress, quiet: true, client });
-			agg.uploaded += s.uploaded;
-			agg.skipped += s.skipped;
-			agg.failed += s.failed;
-			agg.errors.push(...s.errors);
+		if (!hasSecretStorage(plugin.app)) {
+			new Notice(t('notices.noSecretStorage'));
+			return;
 		}
-	} finally {
-		progress.finish();
-	}
+		const missing = missingConnectionFields(plugin.settings);
+		if (missing.length > 0) {
+			new Notice(t('settings.validationMissing', { fields: missing.join(', ') }));
+			return;
+		}
 
-	new Notice(
-		t('notices.uploadDone', {
-			n: agg.uploaded,
-			m: agg.skipped,
-			k: agg.failed,
-		}),
-	);
-	if (agg.errors.length) showFailures(plugin.app, agg.errors);
+		let client: S3Client;
+		try {
+			client = createClient(plugin.app, plugin.settings);
+		} catch (e) {
+			new Notice(e instanceof Error ? e.message : String(e));
+			return;
+		}
+
+		let total = 0;
+		const work: TFile[] = [];
+		for (const f of files) {
+			const body = await plugin.app.vault.cachedRead(f);
+			const { byPath } = collectUploadables(plugin, f, body);
+			if (byPath.size > 0) {
+				total += byPath.size;
+				work.push(f);
+			}
+		}
+		if (total === 0) {
+			new Notice(t('notices.uploadDone', { n: 0, m: 0, k: 0 }));
+			return;
+		}
+
+		const progress = new JobProgress(
+			plugin,
+			total,
+			'progress.upload',
+			plugin.settings.progressCorner,
+		);
+		const agg: UploadStats = { uploaded: 0, skipped: 0, failed: 0, errors: [] };
+		try {
+			for (const f of work) {
+				const s = await uploadNote(plugin, f, { progress, quiet: true, client });
+				agg.uploaded += s.uploaded;
+				agg.skipped += s.skipped;
+				agg.failed += s.failed;
+				agg.errors.push(...s.errors);
+			}
+		} finally {
+			progress.finish();
+		}
+
+		new Notice(
+			t('notices.uploadDone', {
+				n: agg.uploaded,
+				m: agg.skipped,
+				k: agg.failed,
+			}),
+		);
+		if (agg.errors.length) showFailures(plugin.app, agg.errors);
+	});
 }
 
 export { activeMarkdown, resolveLocal, notesLinkingPath };
