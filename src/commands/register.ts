@@ -21,6 +21,11 @@ export function registerCommands(plugin: AssetsOffloaderPlugin): void {
 		callback: () => void uploadCurrentFolder(plugin),
 	});
 	plugin.addCommand({
+		id: 'upload-folder-assets-recursive',
+		name: t('commands.uploadFolderRecursive'),
+		callback: () => void uploadCurrentFolder(plugin, { recursive: true }),
+	});
+	plugin.addCommand({
 		id: 'localize-note-assets',
 		name: t('commands.localizeNote'),
 		callback: () => void localizeCurrentNote(plugin),
@@ -29,6 +34,11 @@ export function registerCommands(plugin: AssetsOffloaderPlugin): void {
 		id: 'localize-folder-assets',
 		name: t('commands.localizeFolder'),
 		callback: () => void localizeCurrentFolder(plugin),
+	});
+	plugin.addCommand({
+		id: 'localize-folder-assets-recursive',
+		name: t('commands.localizeFolderRecursive'),
+		callback: () => void localizeCurrentFolder(plugin, { recursive: true }),
 	});
 	plugin.addCommand({
 		id: 'convert-note-wikilinks-to-markdown',

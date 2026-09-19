@@ -17,6 +17,8 @@ import { showConflicts, showFailures } from '../ui/conflict-modal';
 import { JobProgress } from '../ui/job-progress';
 import { runExclusive } from '../job-lock';
 import { activeMarkdown } from './upload';
+import { markdownNotesInFolder } from './folder-notes';
+import { confirmRecursiveFolder } from './confirm-recursive';
 
 export interface LocalizeConflict {
 	note: string;
@@ -187,13 +189,20 @@ export async function localizeCurrentNote(plugin: AssetsOffloaderPlugin): Promis
 	});
 }
 
-export async function localizeCurrentFolder(plugin: AssetsOffloaderPlugin): Promise<void> {
+export async function localizeCurrentFolder(
+	plugin: AssetsOffloaderPlugin,
+	opts?: { recursive?: boolean },
+): Promise<void> {
 	await runExclusive(async () => {
+		const recursive = opts?.recursive === true;
 		const note = activeMarkdown(plugin.app);
-		const folder: TFolder | null = note?.parent ?? plugin.app.vault.getRoot();
-		const files = folder.children.filter(
-			(f): f is TFile => f instanceof TFile && f.extension === 'md',
-		);
+		const folder: TFolder = note?.parent ?? plugin.app.vault.getRoot();
+		const files = markdownNotesInFolder(folder, recursive);
+
+		if (recursive) {
+			const ok = await confirmRecursiveFolder(plugin.app, folder, files.length, 'localize');
+			if (!ok) return;
+		}
 
 		let total = 0;
 		const work: TFile[] = [];

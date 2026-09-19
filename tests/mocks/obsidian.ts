@@ -20,6 +20,19 @@ export class Modal {
 	onClose() {}
 }
 
+export class FuzzySuggestModal<T> extends Modal {
+	constructor(app: unknown) {
+		super(app);
+	}
+	getItems(): T[] {
+		return [];
+	}
+	getItemText(_item: T): string {
+		return '';
+	}
+	onChooseItem(_item: T, _evt: MouseEvent): void {}
+}
+
 export class Setting {
 	constructor(_el: unknown) {}
 	setName() {
@@ -132,8 +145,11 @@ export class TFile {
 }
 
 export class TFolder {
-	children: unknown[] = [];
+	path = '';
+	children: TAbstractFile[] = [];
 }
+
+export type TAbstractFile = TFile | TFolder;
 
 export function normalizePath(p: string): string {
 	return p;

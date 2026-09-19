@@ -3,8 +3,10 @@ export const en = {
 
 	'commands.uploadNote': "Upload current note's local assets",
 	'commands.uploadFolder': "Upload current folder's local assets",
+	'commands.uploadFolderRecursive': "Upload current folder's local assets recursively",
 	'commands.localizeNote': "Localize current note's assets",
 	'commands.localizeFolder': "Localize current folder's remote assets",
+	'commands.localizeFolderRecursive': "Localize current folder's remote assets recursively",
 	'commands.convertWikiToMd': 'Convert current note wikilinks to markdown links',
 	'commands.convertMdToWiki': 'Convert current note markdown links to wikilinks',
 	'commands.openGallery': 'Open remote asset gallery',
@@ -131,6 +133,10 @@ export const en = {
 	'modal.confirmBulkDelete': 'Delete {n} objects from storage? This cannot be undone.',
 	'modal.confirmBulkDeleteUsed':
 		'Delete {n} objects? {m} notes still reference some of them. This cannot be undone.',
+	'modal.confirmRecursiveUpload':
+		'Upload local assets from all notes under "{folder}", including nested folders ({n} notes). If this is the vault root, that is the whole vault.',
+	'modal.confirmRecursiveLocalize':
+		'Localize remote assets from all notes under "{folder}", including nested folders ({n} notes). If this is the vault root, that is the whole vault.',
 	'modal.confirm': 'Confirm',
 	'modal.cancel': 'Cancel',
 	'modal.close': 'Close',

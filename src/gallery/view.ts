@@ -547,7 +547,9 @@ export class GalleryView extends ItemView {
 			const client = this.client;
 			if (!client || this.selected.size === 0) return;
 			const keys = [...this.selected];
-			const items = keys.map((k) => this.entries.get(k)).filter((e): e is GalleryEntry => !!e);
+			const items = keys
+				.map((k) => this.entries.get(k))
+				.filter((e): e is GalleryEntry => !!e);
 
 			const usedNotes = new Set<string>();
 			for (const entry of items) {
@@ -562,7 +564,10 @@ export class GalleryView extends ItemView {
 				);
 				if (!ok) return;
 			} else {
-				const ok = await confirm(this.app, t('modal.confirmBulkDelete', { n: items.length }));
+				const ok = await confirm(
+					this.app,
+					t('modal.confirmBulkDelete', { n: items.length }),
+				);
 				if (!ok) return;
 			}
 

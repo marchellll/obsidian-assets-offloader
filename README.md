@@ -22,15 +22,17 @@ R2 field-by-field (endpoint host, CORS, token): [docs/r2-setup.md](./docs/r2-set
 
 ## How to use
 
-**Upload.** Open a markdown note that embeds local files (`![[photo.png]]` or `![](photo.png)`). Run **Upload current note's local assets**. Matching whitelist files go to `{prefix}/{YYYYMM}/{name}` in the bucket, and the note links become markdown URLs under **Public URL base**. **Upload current folder's local assets** does the same for every note in the current folder (not recursive).
+**Upload.** Open a markdown note that embeds local files (`![[photo.png]]` or `![](photo.png)`). Run **Upload current note's local assets**. Matching whitelist files go to `{prefix}/{YYYYMM}/{name}` in the bucket, and the note links become markdown URLs under **Public URL base**. **Upload current folder's local assets** does the same for every note in the current folder (not recursive). **Upload current folder's local assets recursively** also includes nested folders — see the warning below.
 
 ![Upload](./images/upload.mp4)
 
 **Optional delete.** If **Delete local file after successful upload** is on, the plugin trashes the local file only after PUT succeeds and the note was rewritten, and only if nothing else still links to that file.
 
-**Localize.** Run **Localize current note's assets** (or the folder command) to download remote files using Obsidian’s attachment folder rules and rewrite links back to local paths.
+**Localize.** Run **Localize current note's assets** (or the folder / recursive folder command) to download remote files using Obsidian’s attachment folder rules and rewrite links back to local paths.
 
 ![Localize](./images/localize.mp4)
+
+> **Warning — recursive folder commands.** Recursive upload and localize process every markdown note under the current folder, including all nested folders. If the active note is in the vault root, that is the **whole vault**. They can take a long time, upload or download many files, and rewrite many notes. A confirm dialog appears first; cancel does nothing. Prefer the non-recursive folder command unless you intend that scope.
 
 **Gallery.** The ribbon (or **Open remote asset gallery**) lists objects in the bucket by month. Open a file to preview it, insert a link, or download it into the vault.
 
@@ -57,15 +59,17 @@ Local reads and writes stay **inside the vault**: markdown, attachments, and Obs
 
 ## Commands
 
-| Command                                          | What it does                       |
-| ------------------------------------------------ | ---------------------------------- |
-| Upload current note's local assets               | Upload and rewrite links           |
-| Upload current folder's local assets             | Same, every note in the folder     |
-| Localize current note's assets                   | Download remotes into the vault    |
-| Localize current folder's remote assets          | Same, folder, not recursive        |
-| Convert current note wikilinks to markdown links | Syntax only                        |
-| Convert current note markdown links to wikilinks | Internal links only; leave http(s) |
-| Open remote asset gallery                        | Same as the ribbon                 |
+| Command                                             | What it does                                   |
+| --------------------------------------------------- | ---------------------------------------------- |
+| Upload current note's local assets                  | Upload and rewrite links                       |
+| Upload current folder's local assets                | Same, every note in the folder (not recursive) |
+| Upload current folder's local assets recursively    | Same, including nested folders (confirm first) |
+| Localize current note's assets                      | Download remotes into the vault                |
+| Localize current folder's remote assets             | Same, folder, not recursive                    |
+| Localize current folder's remote assets recursively | Same, including nested folders (confirm first) |
+| Convert current note wikilinks to markdown links    | Syntax only                                    |
+| Convert current note markdown links to wikilinks    | Internal links only; leave http(s)             |
+| Open remote asset gallery                           | Same as the ribbon                             |
 
 ## Development
 

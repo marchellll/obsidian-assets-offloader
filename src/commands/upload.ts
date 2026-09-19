@@ -22,6 +22,8 @@ import { basenameOf, formatRemoteLink, rewriteTargets } from '../links/rewrite';
 import { showFailures } from '../ui/conflict-modal';
 import { JobProgress } from '../ui/job-progress';
 import { runExclusive } from '../job-lock';
+import { markdownNotesInFolder } from './folder-notes';
+import { confirmRecursiveFolder } from './confirm-recursive';
 
 function activeMarkdown(app: App): TFile | null {
 	const f = app.workspace.getActiveFile();
@@ -237,16 +239,23 @@ export async function uploadCurrentNote(plugin: AssetsOffloaderPlugin): Promise<
 	});
 }
 
-export async function uploadCurrentFolder(plugin: AssetsOffloaderPlugin): Promise<void> {
+export async function uploadCurrentFolder(
+	plugin: AssetsOffloaderPlugin,
+	opts?: { recursive?: boolean },
+): Promise<void> {
 	await runExclusive(async () => {
+		const recursive = opts?.recursive === true;
 		const note = activeMarkdown(plugin.app);
-		const folder: TFolder | null = note?.parent ?? plugin.app.vault.getRoot();
-		const files = folder.children.filter(
-			(f): f is TFile => f instanceof TFile && f.extension === 'md',
-		);
+		const folder: TFolder = note?.parent ?? plugin.app.vault.getRoot();
+		const files = markdownNotesInFolder(folder, recursive);
 		if (files.length === 0) {
 			new Notice(t('notices.noActiveNote'));
 			return;
+		}
+
+		if (recursive) {
+			const ok = await confirmRecursiveFolder(plugin.app, folder, files.length, 'upload');
+			if (!ok) return;
 		}
 
 		if (!hasSecretStorage(plugin.app)) {
