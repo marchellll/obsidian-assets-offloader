@@ -241,6 +241,50 @@ Assets Offloader gallery
 	margin-top: 0.25rem;
 }
 
+/* Test connection: press + busy (list/put/get can take a few seconds) */
+button.assets-offloader-test-btn {
+	position: relative;
+}
+
+button.assets-offloader-test-btn:hover:not(:disabled) {
+	filter: brightness(1.06);
+}
+
+button.assets-offloader-test-btn:active:not(:disabled) {
+	transform: translateY(1px);
+	filter: brightness(0.88);
+}
+
+button.assets-offloader-test-btn.is-loading,
+button.assets-offloader-test-btn:disabled {
+	opacity: 0.8;
+	cursor: progress;
+}
+
+button.assets-offloader-test-btn.is-loading {
+	padding-left: 1.85em;
+}
+
+button.assets-offloader-test-btn.is-loading::before {
+	content: '';
+	position: absolute;
+	left: 0.55em;
+	top: 50%;
+	width: 0.8em;
+	height: 0.8em;
+	margin-top: -0.4em;
+	border: 2px solid currentColor;
+	border-right-color: transparent;
+	border-radius: 50%;
+	animation: assets-offloader-spin 0.7s linear infinite;
+}
+
+@keyframes assets-offloader-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
 .assets-offloader-list-modal-body {
 	user-select: text;
 	-webkit-user-select: text;

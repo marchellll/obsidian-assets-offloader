@@ -49,6 +49,7 @@ export const en = {
 	'settings.progressCornerDesc':
 		'Where upload/localize progress appears (done count, queue remaining, current file).',
 	'settings.testConnection': 'Test connection',
+	'settings.testConnectionTesting': 'Testing…',
 	'settings.testConnectionDesc':
 		'Checks list, put, and get (the ops this plugin needs). Does not delete; overwrites a small probe object under .assets-offloader/.',
 	'settings.providerExtras': 'Provider extra fields',

@@ -8,6 +8,7 @@ import {
 	Notice,
 	PluginSettingTab,
 	SecretComponent,
+	type ButtonComponent,
 	type SettingDefinition,
 	type SettingDefinitionItem,
 } from 'obsidian';
@@ -37,22 +38,48 @@ export type R2Jurisdiction = 'default' | 'eu' | 'fedramp';
 export type LocalizedLinkStyle = 'wikilink' | 'markdown';
 export type ProgressCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
-export const DEFAULT_WHITELIST = `*.png
-*.jpg
-*.jpeg
-*.gif
-*.webp
-*.svg
+export const DEFAULT_WHITELIST = `*.avif
 *.bmp
+*.dng
+*.gif
+*.heic
+*.heif
 *.ico
-*.mp4
-*.webm
-*.mov
+*.jpeg
+*.jpg
+*.png
+*.raw
+*.svg
+*.tif
+*.tiff
+*.webp
+*.3gp
+*.avi
+*.flv
+*.m2ts
 *.m4v
+*.mkv
+*.mov
 *.mp3
-*.wav
+*.mp4
+*.mpeg
+*.mpg
+*.mts
 *.ogg
+*.wav
+*.webm
+*.wmv
+*.7z
+*.bz2
+*.dmg
+*.gz
+*.img
+*.iso
 *.pdf
+*.rar
+*.tar
+*.toast
+*.wim
 *.zip`;
 
 export interface AssetsOffloaderSettings {
@@ -325,9 +352,13 @@ export class AssetsOffloaderSettingTab extends PluginSettingTab {
 				desc: t('settings.testConnectionDesc'),
 				render: (setting) => {
 					setting.addButton((btn) =>
-						btn.setButtonText(t('settings.testConnection')).onClick(() => {
-							void this.testConnection();
-						}),
+						btn
+							.setButtonText(t('settings.testConnection'))
+							.setCta()
+							.setClass('assets-offloader-test-btn')
+							.onClick(() => {
+								void this.testConnection(btn);
+							}),
 					);
 				},
 			},
@@ -473,7 +504,16 @@ export class AssetsOffloaderSettingTab extends PluginSettingTab {
 		this.update();
 	}
 
-	private async testConnection(): Promise<void> {
+	private setTestButtonBusy(btn: ButtonComponent, busy: boolean): void {
+		btn.setDisabled(busy);
+		btn.setButtonText(
+			busy ? t('settings.testConnectionTesting') : t('settings.testConnection'),
+		);
+		btn.buttonEl.toggleClass('is-loading', busy);
+	}
+
+	private async testConnection(btn: ButtonComponent): Promise<void> {
+		if (btn.buttonEl.disabled || btn.buttonEl.hasClass('is-loading')) return;
 		const miss = missingConnectionFields(this.plugin.settings);
 		if (miss.length > 0) {
 			new Notice(t('settings.validationMissing', { fields: miss.join(', ') }));
@@ -483,6 +523,7 @@ export class AssetsOffloaderSettingTab extends PluginSettingTab {
 			new Notice(t('notices.noSecretStorage'));
 			return;
 		}
+		this.setTestButtonBusy(btn, true);
 		try {
 			const { testConnection } = await import('./s3/client');
 			await testConnection(this.app, this.plugin.settings);
@@ -491,6 +532,8 @@ export class AssetsOffloaderSettingTab extends PluginSettingTab {
 			new Notice(
 				t('notices.testFail', { error: e instanceof Error ? e.message : String(e) }),
 			);
+		} finally {
+			if (btn.buttonEl.isConnected) this.setTestButtonBusy(btn, false);
 		}
 	}
 
