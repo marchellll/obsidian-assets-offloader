@@ -27,6 +27,23 @@ Assets Offloader gallery
 	background: var(--background-primary);
 }
 
+.assets-offloader-gallery-search {
+	flex: 1 1 12rem;
+	min-width: 8rem;
+	max-width: 24rem;
+}
+
+.assets-offloader-gallery-view-toggle {
+	display: flex;
+	gap: 0.15rem;
+	flex-shrink: 0;
+}
+
+.assets-offloader-gallery-view-toggle .clickable-icon.is-active {
+	background: var(--background-modifier-hover);
+	color: var(--interactive-accent);
+}
+
 .assets-offloader-gallery-select-info {
 	flex: 1;
 	min-width: 6rem;
@@ -40,11 +57,65 @@ Assets Offloader gallery
 	flex-wrap: wrap;
 }
 
-.assets-offloader-gallery-grid {
+.assets-offloader-gallery-items.is-grid {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.75rem;
 	align-items: flex-start;
+}
+
+.assets-offloader-gallery-items.is-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	align-items: stretch;
+}
+
+.assets-offloader-gallery-show-more {
+	flex: 0 0 100%;
+	margin: 0.75rem 0 0.25rem;
+	align-self: center;
+}
+
+.assets-offloader-row {
+	display: flex;
+	align-items: center;
+	gap: 0.65rem;
+	width: 100%;
+	padding: 0.35rem 0.4rem;
+	border-radius: var(--radius-s);
+	cursor: context-menu;
+	position: relative;
+}
+
+.assets-offloader-row:hover {
+	background: var(--background-modifier-hover);
+}
+
+.assets-offloader-row.is-selected {
+	background: var(--background-modifier-hover);
+	outline: 1px solid var(--interactive-accent);
+}
+
+.assets-offloader-row .assets-offloader-cell-check {
+	position: static;
+	flex-shrink: 0;
+}
+
+.assets-offloader-row-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--font-ui-small);
+}
+
+.assets-offloader-row-size {
+	flex-shrink: 0;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
 }
 
 .assets-offloader-month {

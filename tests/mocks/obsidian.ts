@@ -155,6 +155,14 @@ export function normalizePath(p: string): string {
 	return p;
 }
 
+export function prepareFuzzySearch(_query: string): (text: string) => null {
+	return () => null;
+}
+
+export function renderResults(_el: unknown, _text: string, _result: unknown): void {}
+
+export function setIcon(_parent: unknown, _iconId: string): void {}
+
 export async function requestUrl(_params: unknown): Promise<{
 	status: number;
 	headers: Record<string, string>;

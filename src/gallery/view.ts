@@ -1,15 +1,31 @@
 /**
  * Remote asset gallery ItemView + ribbon registration.
- * Months from S3 prefixes; first paint last 5 non-empty; scroll loads older;
- * IntersectionObserver creates media when a cell nears the viewport.
- * Cells support multi-select + bulk delete.
+ * Loads a full key catalog once; list view is default (no media bytes).
+ * Grid lazily creates media via IntersectionObserver. Local fuzzy search on basename.
  */
-import { ItemView, Menu, Notice, TFile, WorkspaceLeaf } from 'obsidian';
+import {
+	ItemView,
+	Menu,
+	Notice,
+	TFile,
+	WorkspaceLeaf,
+	prepareFuzzySearch,
+	renderResults,
+	setIcon,
+} from 'obsidian';
 import type AssetsOffloaderPlugin from '../main';
 import { t } from '../i18n';
 import { createClient, type ListedObject, type S3Client } from '../s3/client';
 import { hasSecretStorage } from '../settings';
-import { listMonthObjects, listMonths } from './list';
+import { listAllAssets, type CatalogEntry } from './list';
+import {
+	GalleryCatalog,
+	PAGE_SIZE,
+	basenameOfKey,
+	clearCatalogSpill,
+	formatByteSize,
+} from './catalog';
+import type { RankedHit } from './search';
 import { findNotesUsingUrl } from './usage';
 import { showUsage } from '../ui/usage-modal';
 import { confirm } from '../ui/confirm-modal';
@@ -28,6 +44,8 @@ const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'i
 const VIDEO_EXT = new Set(['mp4', 'webm', 'mov', 'm4v']);
 const AUDIO_EXT = new Set(['mp3', 'wav', 'ogg']);
 
+type ViewMode = 'list' | 'grid';
+
 interface GalleryEntry {
 	obj: ListedObject;
 	url: string;
@@ -40,17 +58,33 @@ function extOf(key: string): string {
 	return (key.split('.').pop() ?? '').toLowerCase();
 }
 
+function mediaKind(ext: string): 'image' | 'video' | 'audio' | 'other' {
+	if (IMAGE_EXT.has(ext)) return 'image';
+	if (VIDEO_EXT.has(ext)) return 'video';
+	if (AUDIO_EXT.has(ext)) return 'audio';
+	return 'other';
+}
+
 export class GalleryView extends ItemView {
 	plugin: AssetsOffloaderPlugin;
-	private months: string[] = [];
-	private loadedCount = 0;
 	private client: S3Client | null = null;
+	private catalog: GalleryCatalog | null = null;
+	private viewMode: ViewMode = 'list';
+	private searchQuery = '';
+	private visibleCount = PAGE_SIZE;
+	private searchTimer: number | null = null;
+	private renderToken = 0;
+
 	private toolbarEl!: HTMLElement;
 	private selectInfoEl!: HTMLElement;
 	private deleteBtn!: HTMLButtonElement;
-	private gridEl!: HTMLElement;
+	private searchInput!: HTMLInputElement;
+	private listBtn!: HTMLButtonElement;
+	private gridBtn!: HTMLButtonElement;
+	private itemsEl!: HTMLElement;
 	private observer: IntersectionObserver | null = null;
-	/** key → entry for every rendered cell */
+
+	/** key → entry for every rendered row/cell */
 	private entries = new Map<string, GalleryEntry>();
 	/** currently checked keys */
 	private selected = new Set<string>();
@@ -82,6 +116,42 @@ export class GalleryView extends ItemView {
 		contentEl.addClass('assets-offloader-gallery');
 
 		this.toolbarEl = contentEl.createDiv({ cls: 'assets-offloader-gallery-toolbar' });
+
+		this.searchInput = this.toolbarEl.createEl('input', {
+			cls: 'assets-offloader-gallery-search',
+			type: 'search',
+			attr: {
+				placeholder: t('gallery.searchPlaceholder'),
+				'aria-label': t('gallery.searchPlaceholder'),
+			},
+		});
+		this.searchInput.addEventListener('input', () => {
+			if (this.searchTimer !== null) window.clearTimeout(this.searchTimer);
+			this.searchTimer = window.setTimeout(() => {
+				this.searchTimer = null;
+				this.searchQuery = this.searchInput.value;
+				this.visibleCount = PAGE_SIZE;
+				void this.renderFromCatalog();
+			}, 200);
+		});
+
+		const viewToggle = this.toolbarEl.createDiv({
+			cls: 'assets-offloader-gallery-view-toggle',
+		});
+		this.listBtn = viewToggle.createEl('button', {
+			cls: 'clickable-icon',
+			attr: { 'aria-label': t('gallery.listView'), type: 'button' },
+		});
+		setIcon(this.listBtn, 'list');
+		this.listBtn.addEventListener('click', () => this.setViewMode('list'));
+
+		this.gridBtn = viewToggle.createEl('button', {
+			cls: 'clickable-icon',
+			attr: { 'aria-label': t('gallery.gridView'), type: 'button' },
+		});
+		setIcon(this.gridBtn, 'layout-grid');
+		this.gridBtn.addEventListener('click', () => this.setViewMode('grid'));
+
 		this.selectInfoEl = this.toolbarEl.createSpan({
 			cls: 'assets-offloader-gallery-select-info',
 		});
@@ -110,16 +180,18 @@ export class GalleryView extends ItemView {
 			void this.deleteSelected();
 		});
 
-		this.gridEl = contentEl.createDiv({ cls: 'assets-offloader-gallery-grid' });
-		contentEl.addEventListener('scroll', () => {
-			if (contentEl.scrollTop + contentEl.clientHeight >= contentEl.scrollHeight - 80) {
-				void this.loadMore();
-			}
-		});
+		this.itemsEl = contentEl.createDiv({ cls: 'assets-offloader-gallery-items' });
+		this.syncViewModeUi();
+		this.resetObserver();
+		this.updateSelectionUi();
+		await this.reload();
+	}
 
+	private resetObserver(): void {
+		this.observer?.disconnect();
 		this.observer = new IntersectionObserver(
-			(entries) => {
-				for (const e of entries) {
+			(obsEntries) => {
+				for (const e of obsEntries) {
 					if (!e.isIntersecting) continue;
 					const el = e.target as HTMLElement;
 					const url = el.dataset['src'];
@@ -143,20 +215,41 @@ export class GalleryView extends ItemView {
 					}
 				}
 			},
-			{ root: contentEl, rootMargin: '200px' },
+			{ root: this.contentEl, rootMargin: '200px' },
 		);
-
-		this.updateSelectionUi();
-		await this.reload();
 	}
 
 	async onClose(): Promise<void> {
+		if (this.searchTimer !== null) {
+			window.clearTimeout(this.searchTimer);
+			this.searchTimer = null;
+		}
 		this.observer?.disconnect();
 		this.observer = null;
 		this.entries.clear();
 		this.selected.clear();
 		this.monthKeys.clear();
 		this.monthChecks.clear();
+		await this.catalog?.clear();
+		this.catalog = null;
+	}
+
+	private pluginDir(): string {
+		return this.plugin.manifest.dir ?? `.obsidian/plugins/${this.plugin.manifest.id}`;
+	}
+
+	private setViewMode(mode: ViewMode): void {
+		if (this.viewMode === mode) return;
+		this.viewMode = mode;
+		this.syncViewModeUi();
+		void this.renderFromCatalog();
+	}
+
+	private syncViewModeUi(): void {
+		this.listBtn.toggleClass('is-active', this.viewMode === 'list');
+		this.gridBtn.toggleClass('is-active', this.viewMode === 'grid');
+		this.itemsEl.toggleClass('is-list', this.viewMode === 'list');
+		this.itemsEl.toggleClass('is-grid', this.viewMode === 'grid');
 	}
 
 	private updateSelectionUi(): void {
@@ -191,24 +284,26 @@ export class GalleryView extends ItemView {
 
 	private applySelected(key: string, on: boolean): void {
 		const entry = this.entries.get(key);
-		if (!entry) return;
 		if (on) {
 			this.selected.add(key);
-			entry.cell.addClass('is-selected');
-			entry.check.checked = true;
+			if (entry) {
+				entry.cell.addClass('is-selected');
+				entry.check.checked = true;
+			}
 		} else {
 			this.selected.delete(key);
-			entry.cell.removeClass('is-selected');
-			entry.check.checked = false;
+			if (entry) {
+				entry.cell.removeClass('is-selected');
+				entry.check.checked = false;
+			}
 		}
 	}
 
 	private setSelected(key: string, on: boolean): void {
 		const entry = this.entries.get(key);
-		if (!entry) return;
 		this.applySelected(key, on);
 		this.updateSelectionUi();
-		this.syncMonthCheck(entry.month);
+		if (entry) this.syncMonthCheck(entry.month);
 	}
 
 	private setMonthSelected(month: string, on: boolean): void {
@@ -239,13 +334,15 @@ export class GalleryView extends ItemView {
 
 	private removeEntry(key: string): void {
 		const entry = this.entries.get(key);
-		if (!entry) return;
 		this.selected.delete(key);
 		this.entries.delete(key);
-		this.monthKeys.get(entry.month)?.delete(key);
-		entry.cell.remove();
-		this.syncMonthCheck(entry.month);
+		if (entry) {
+			this.monthKeys.get(entry.month)?.delete(key);
+			entry.cell.remove();
+			this.syncMonthCheck(entry.month);
+		}
 		this.updateSelectionUi();
+		void this.catalog?.remove(key);
 	}
 
 	private async reload(): Promise<void> {
@@ -253,94 +350,126 @@ export class GalleryView extends ItemView {
 		this.entries.clear();
 		this.monthKeys.clear();
 		this.monthChecks.clear();
-		this.gridEl.empty();
-		this.months = [];
-		this.loadedCount = 0;
+		this.itemsEl.empty();
 		this.client = null;
+		this.visibleCount = PAGE_SIZE;
+		this.viewMode = 'list';
+		this.searchQuery = '';
+		this.searchInput.value = '';
+		this.syncViewModeUi();
+
+		await this.catalog?.clear();
+		this.catalog = null;
 
 		if (!hasSecretStorage(this.app)) {
-			this.gridEl.createEl('p', { text: t('notices.noSecretStorage') });
+			this.itemsEl.createEl('p', { text: t('notices.noSecretStorage') });
 			return;
 		}
+
+		const loading = this.itemsEl.createEl('p', { text: t('gallery.loading') });
 		try {
 			this.client = createClient(this.app, this.plugin.settings);
-			this.months = await listMonths(this.client, this.plugin.settings.prefix);
+			const entries = await listAllAssets(this.client, this.plugin.settings.prefix);
+			loading.remove();
+			if (entries.length === 0) {
+				this.itemsEl.createEl('p', { text: t('gallery.empty') });
+				return;
+			}
+			this.catalog = new GalleryCatalog(this.app);
+			await this.catalog.load(entries, this.pluginDir());
+			await this.renderFromCatalog();
 		} catch (e) {
-			this.gridEl.createEl('p', {
+			loading.remove();
+			this.itemsEl.createEl('p', {
 				text: e instanceof Error ? e.message : String(e),
 			});
-			return;
 		}
-		if (this.months.length === 0) {
-			this.gridEl.createEl('p', { text: t('gallery.empty') });
-			return;
-		}
-		await this.loadMore(5);
 	}
 
-	private async loadMore(count = 1): Promise<void> {
-		if (!this.client) return;
-		const end = Math.min(this.loadedCount + count, this.months.length);
-		if (this.loadedCount >= end) return;
-		const loading = this.gridEl.createEl('p', { text: t('gallery.loading') });
-		for (let i = this.loadedCount; i < end; i++) {
-			const month = this.months[i]!;
-			const header = this.gridEl.createDiv({ cls: 'assets-offloader-month' });
-			const monthCheck = header.createEl('input', {
-				cls: 'assets-offloader-month-check',
-				type: 'checkbox',
-				attr: { 'aria-label': t('gallery.selectMonth', { month }) },
-			});
-			header.createSpan({ text: month, cls: 'assets-offloader-month-label' });
-			this.monthChecks.set(month, monthCheck);
-			this.monthKeys.set(month, new Set());
-			monthCheck.addEventListener('change', () => {
-				this.setMonthSelected(month, monthCheck.checked);
-			});
+	private async renderFromCatalog(): Promise<void> {
+		const catalog = this.catalog;
+		const client = this.client;
+		if (!catalog || !client) return;
 
-			const objects = await listMonthObjects(this.client, this.plugin.settings.prefix, month);
-			for (const obj of objects) {
-				this.renderCell(obj, month);
+		const token = ++this.renderToken;
+		const page = await catalog.query(
+			this.searchQuery,
+			0,
+			this.visibleCount,
+			prepareFuzzySearch,
+		);
+		if (token !== this.renderToken) return;
+
+		this.resetObserver();
+		this.entries.clear();
+		this.monthKeys.clear();
+		this.monthChecks.clear();
+		this.itemsEl.empty();
+
+		const searching = this.searchQuery.trim().length > 0;
+		if (page.total === 0) {
+			this.itemsEl.createEl('p', {
+				text: searching ? t('gallery.noMatches') : t('gallery.empty'),
+			});
+			this.updateSelectionUi();
+			return;
+		}
+
+		let lastMonth = '';
+		for (const hit of page.items) {
+			if (!searching && hit.entry.month !== lastMonth) {
+				lastMonth = hit.entry.month;
+				this.renderMonthHeader(hit.entry.month);
 			}
-			this.syncMonthCheck(month);
+			if (this.viewMode === 'list') {
+				this.renderListRow(hit, searching);
+			} else {
+				this.renderGridCell(hit, searching);
+			}
 		}
-		loading.remove();
-		this.loadedCount = end;
+
+		this.syncAllMonthChecks();
+		this.updateSelectionUi();
+
+		if (page.items.length < page.total) {
+			const more = this.itemsEl.createEl('button', {
+				cls: 'assets-offloader-gallery-show-more mod-cta',
+				text: t('gallery.showMore'),
+			});
+			more.addEventListener('click', () => {
+				this.visibleCount += PAGE_SIZE;
+				void this.renderFromCatalog();
+			});
+		}
 	}
 
-	private renderCell(obj: ListedObject, month: string): void {
-		if (!this.client) return;
-		const url = this.client.publicUrl(obj.key);
-		const ext = extOf(obj.key);
-		const cell = this.gridEl.createDiv({ cls: 'assets-offloader-cell' });
-
-		const check = cell.createEl('input', {
-			cls: 'assets-offloader-cell-check',
+	private renderMonthHeader(month: string): void {
+		const header = this.itemsEl.createDiv({ cls: 'assets-offloader-month' });
+		const monthCheck = header.createEl('input', {
+			cls: 'assets-offloader-month-check',
 			type: 'checkbox',
-			attr: { 'aria-label': t('gallery.select') },
+			attr: { 'aria-label': t('gallery.selectMonth', { month }) },
 		});
+		header.createSpan({ text: month, cls: 'assets-offloader-month-label' });
+		this.monthChecks.set(month, monthCheck);
+		this.monthKeys.set(month, new Set());
+		monthCheck.addEventListener('change', () => {
+			this.setMonthSelected(month, monthCheck.checked);
+		});
+	}
+
+	private bindSelectionAndMenu(
+		cell: HTMLElement,
+		check: HTMLInputElement,
+		obj: ListedObject,
+		url: string,
+		kind: ReturnType<typeof mediaKind>,
+		name: string,
+	): void {
 		check.addEventListener('click', (evt) => evt.stopPropagation());
 		check.addEventListener('change', () => {
 			this.setSelected(obj.key, check.checked);
 		});
-
-		const media = cell.createDiv({ cls: 'assets-offloader-media' });
-		const name = obj.key.split('/').pop() ?? obj.key;
-		cell.createDiv({ cls: 'assets-offloader-caption', text: name });
-
-		let kind = 'other';
-		if (IMAGE_EXT.has(ext)) kind = 'image';
-		else if (VIDEO_EXT.has(ext)) kind = 'video';
-		else if (AUDIO_EXT.has(ext)) kind = 'audio';
-		else {
-			media.createDiv({ text: ext || 'file' });
-		}
-		media.dataset['src'] = url;
-		media.dataset['kind'] = kind;
-		if (kind !== 'other') this.observer?.observe(media);
-
-		this.entries.set(obj.key, { obj, url, cell, check, month });
-		this.monthKeys.get(month)?.add(obj.key);
 
 		if (kind === 'image' || kind === 'video' || kind === 'audio') {
 			cell.addClass('assets-offloader-cell-previewable');
@@ -351,7 +480,6 @@ export class GalleryView extends ItemView {
 				) {
 					return;
 				}
-				// Shift/meta/ctrl+click toggles selection instead of preview.
 				if (evt.shiftKey || evt.metaKey || evt.ctrlKey) {
 					evt.preventDefault();
 					this.setSelected(obj.key, !this.selected.has(obj.key));
@@ -422,11 +550,103 @@ export class GalleryView extends ItemView {
 			);
 			menu.addItem((item) =>
 				item.setTitle(t('gallery.delete')).onClick(() => {
-					void this.deleteObject(obj, url, cell);
+					void this.deleteObject(obj, url);
 				}),
 			);
 			menu.showAtMouseEvent(evt);
 		});
+	}
+
+	private registerEntry(
+		entry: CatalogEntry,
+		cell: HTMLElement,
+		check: HTMLInputElement,
+		url: string,
+	): void {
+		const obj: ListedObject = { key: entry.key, size: entry.size };
+		this.entries.set(entry.key, { obj, url, cell, check, month: entry.month });
+		this.monthKeys.get(entry.month)?.add(entry.key);
+		if (this.selected.has(entry.key)) {
+			cell.addClass('is-selected');
+			check.checked = true;
+		}
+	}
+
+	private renderListRow(hit: RankedHit<CatalogEntry>, searching: boolean): void {
+		if (!this.client) return;
+		const entry = hit.entry;
+		const url = this.client.publicUrl(entry.key);
+		const name = basenameOfKey(entry.key);
+		const kind = mediaKind(extOf(entry.key));
+		const cell = this.itemsEl.createDiv({ cls: 'assets-offloader-row' });
+
+		const check = cell.createEl('input', {
+			cls: 'assets-offloader-cell-check',
+			type: 'checkbox',
+			attr: { 'aria-label': t('gallery.select') },
+		});
+
+		const nameEl = cell.createDiv({ cls: 'assets-offloader-row-name' });
+		if (searching && hit.matches.length > 0) {
+			renderResults(nameEl, name, { score: hit.score, matches: hit.matches });
+		} else {
+			nameEl.setText(name);
+		}
+
+		cell.createDiv({
+			cls: 'assets-offloader-row-size',
+			text: formatByteSize(entry.size),
+		});
+
+		this.registerEntry(entry, cell, check, url);
+		this.bindSelectionAndMenu(
+			cell,
+			check,
+			{ key: entry.key, size: entry.size },
+			url,
+			kind,
+			name,
+		);
+	}
+
+	private renderGridCell(hit: RankedHit<CatalogEntry>, searching: boolean): void {
+		if (!this.client) return;
+		const entry = hit.entry;
+		const url = this.client.publicUrl(entry.key);
+		const name = basenameOfKey(entry.key);
+		const kind = mediaKind(extOf(entry.key));
+		const cell = this.itemsEl.createDiv({ cls: 'assets-offloader-cell' });
+
+		const check = cell.createEl('input', {
+			cls: 'assets-offloader-cell-check',
+			type: 'checkbox',
+			attr: { 'aria-label': t('gallery.select') },
+		});
+
+		const media = cell.createDiv({ cls: 'assets-offloader-media' });
+		const caption = cell.createDiv({ cls: 'assets-offloader-caption' });
+		if (searching && hit.matches.length > 0) {
+			renderResults(caption, name, { score: hit.score, matches: hit.matches });
+		} else {
+			caption.setText(name);
+		}
+
+		if (kind === 'other') {
+			media.createDiv({ text: extOf(entry.key) || 'file' });
+		}
+		media.dataset['src'] = url;
+		media.dataset['kind'] = kind;
+		if (kind !== 'other') this.observer?.observe(media);
+
+		this.registerEntry(entry, cell, check, url);
+		this.bindSelectionAndMenu(
+			cell,
+			check,
+			{ key: entry.key, size: entry.size },
+			url,
+			kind,
+			name,
+		);
 	}
 
 	private async downloadObject(
@@ -521,9 +741,10 @@ export class GalleryView extends ItemView {
 		}
 	}
 
-	private async deleteObject(obj: ListedObject, url: string, _cell: HTMLElement): Promise<void> {
+	private async deleteObject(obj: ListedObject, _url: string): Promise<void> {
 		await runExclusive(async () => {
 			if (!this.client) return;
+			const url = this.client.publicUrl(obj.key);
 			const usage = await findNotesUsingUrl(this.app, url);
 			if (usage.length > 0) {
 				showUsage(this.app, usage);
@@ -547,9 +768,11 @@ export class GalleryView extends ItemView {
 			const client = this.client;
 			if (!client || this.selected.size === 0) return;
 			const keys = [...this.selected];
-			const items = keys
-				.map((k) => this.entries.get(k))
-				.filter((e): e is GalleryEntry => !!e);
+			const items = keys.map((k) => {
+				const e = this.entries.get(k);
+				if (e) return { obj: e.obj, url: e.url };
+				return { obj: { key: k, size: 0 }, url: client.publicUrl(k) };
+			});
 
 			const usedNotes = new Set<string>();
 			for (const entry of items) {
@@ -613,5 +836,11 @@ export function registerGallery(plugin: AssetsOffloaderPlugin): void {
 			await leaf.setViewState({ type: GALLERY_VIEW_TYPE, active: true });
 			await plugin.app.workspace.revealLeaf(leaf);
 		})();
+	});
+	plugin.register(() => {
+		void clearCatalogSpill(
+			plugin.app,
+			plugin.manifest.dir ?? `.obsidian/plugins/${plugin.manifest.id}`,
+		);
 	});
 }
